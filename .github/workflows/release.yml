@@ -1,0 +1,67 @@
+name: release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        board: [rpi4, rpi5]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Buildroot host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            automake bash bc binutils bison build-essential bzip2 cpio file \
+            flex genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget
+
+      - name: Cache Buildroot downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            buildroot/dl
+            buildroot/output/${{ matrix.board }}/host
+          key: buildroot-${{ matrix.board }}-${{ hashFiles(format('buildroot-external/configs/glassos_{0}_defconfig', matrix.board)) }}
+          restore-keys: buildroot-${{ matrix.board }}-
+
+      - name: Build image
+        run: make build-${{ matrix.board }}
+
+      - name: Build RAUC bundle and rename image
+        env:
+          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
+        run: |
+          echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-ca.key.pem
+          rauc bundle \
+            --cert=buildroot-external/ota/dev-ca.pem \
+            --key=/tmp/rauc-ca.key.pem \
+            --version="${GITHUB_REF_NAME}" \
+            buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
+            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.raucb
+          rm -f /tmp/rauc-ca.key.pem
+          cp buildroot/output/${{ matrix.board }}/images/sdcard.img \
+            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.img
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

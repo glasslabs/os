@@ -1,28 +1,40 @@
 name: build
 
 on:
-  push:
-    tags:
-      - '*'
   workflow_dispatch:
     inputs:
       board:
-        description: Board to build
+        description: Board to build (leave blank for all)
         type: choice
-        options: [rpi4, rpi5]
+        options: ['', rpi4, rpi5]
         required: false
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Set build matrix
+        id: matrix
+        run: |
+          if [ -n "${{ inputs.board }}" ]; then
+            echo 'matrix=["${{ inputs.board }}"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix=["rpi4","rpi5"]' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: prepare
     strategy:
       matrix:
-        board: [rpi4, rpi5]
+        board: ${{ fromJson(needs.prepare.outputs.matrix) }}
 
     runs-on: ubuntu-latest
+
 
     steps:
       - name: Checkout code
@@ -38,7 +50,7 @@ jobs:
             flex genimage gettext git help2man libncurses-dev libssl-dev \
             make patch perl python3 python3-setuptools rsync texinfo unzip wget
 
-      - name: Cache Buildroot downloads and host toolchain
+      - name: Cache Buildroot downloads
         uses: actions/cache@v4
         with:
           path: |
@@ -50,35 +62,9 @@ jobs:
       - name: Build image
         run: make build-${{ matrix.board }}
 
-      - name: Build RAUC bundle
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        env:
-          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
-        run: |
-          echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-ca.key.pem
-          rauc bundle \
-            --cert=buildroot-external/ota/dev-ca.pem \
-            --key=/tmp/rauc-ca.key.pem \
-            --version="${GITHUB_REF_NAME}" \
-            buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
-            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.raucb
-          rm -f /tmp/rauc-ca.key.pem
-
-      - name: Rename image for release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        run: |
-          cp buildroot/output/${{ matrix.board }}/images/sdcard.img \
-             glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img
-
-      - name: Upload image to release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.img
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
-
+          name: glassos-${{ matrix.board }}
+          path: buildroot/output/${{ matrix.board }}/images/sdcard.img
+          retention-days: 14
