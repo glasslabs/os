@@ -1,0 +1,4 @@
+::sysinit:/etc/init.d/rcS
+::respawn:/usr/bin/glass-agent --addr=:8080 --data-dir=/data
+::shutdown:/etc/init.d/rcK
+

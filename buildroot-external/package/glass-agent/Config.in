@@ -1,0 +1,7 @@
+config BR2_PACKAGE_GLASS_AGENT
+	bool "glass-agent"
+	help
+	  GlassOS management agent. Supervises the glass process and provides
+	  an HTTP API for OTA updates, log access, WiFi configuration, and
+	  config/asset/module uploads.
+

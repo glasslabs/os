@@ -1,0 +1,79 @@
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      board:
+        description: Board to build
+        type: choice
+        options: [rpi4, rpi5]
+        required: false
+
+name: build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        board: [rpi4, rpi5]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Buildroot host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc cpio rsync unzip \
+            libncurses-dev file wget python3 \
+            python3-setuptools python3-pkg-resources \
+            libssl-dev bison flex genimage
+
+      - name: Cache Buildroot downloads and host toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            buildroot/dl
+            buildroot/output/${{ matrix.board }}/host
+          key: buildroot-${{ matrix.board }}-${{ hashFiles(format('buildroot-external/configs/glassos_{0}_defconfig', matrix.board)) }}
+          restore-keys: buildroot-${{ matrix.board }}-
+
+      - name: Build image
+        run: make build-${{ matrix.board }}
+
+      - name: Build RAUC bundle
+        env:
+          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
+        run: |
+          echo "$RAUC_SIGNING_KEY" > /tmp/rauc-ca.key.pem
+          rauc bundle \
+            --cert=buildroot-external/board/common/rauc/ca.cert.pem \
+            --key=/tmp/rauc-ca.key.pem \
+            --version=${{ github.ref_name }} \
+            buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
+          rm -f /tmp/rauc-ca.key.pem
+
+      - name: Rename image for release
+        run: |
+          cp buildroot/output/${{ matrix.board }}/images/sdcard.img \
+             glassos-${{ github.ref_name }}-${{ matrix.board }}.img
+
+      - name: Upload image to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.img
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

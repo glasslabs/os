@@ -1,0 +1,15 @@
+config BR2_PACKAGE_GLASS
+	bool "glass"
+	help
+	  Looking Glass smart mirror binary, downloaded from GitHub Releases.
+
+if BR2_PACKAGE_GLASS
+
+config BR2_PACKAGE_GLASS_VERSION
+	string "glass version"
+	default "v0.0.0"
+	help
+	  The looking-glass release tag to download (e.g. v1.0.0).
+
+endif
+

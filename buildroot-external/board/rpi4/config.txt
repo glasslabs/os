@@ -1,0 +1,15 @@
+# Use KMS driver — required for cage/DRM.
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+
+# Suppress boot splash and delay.
+disable_splash=1
+boot_delay=0
+
+# UART console for debugging.
+enable_uart=1
+
+# Camera/display auto-detect off (not needed for mirror use).
+camera_auto_detect=0
+display_auto_detect=0
+
