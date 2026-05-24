@@ -1,0 +1,17 @@
+[system]
+compatible=${GLASSOS_COMPATIBLE}
+bootloader=uboot
+
+[keyring]
+path=/etc/rauc/keyring.pem
+
+[slot.rootfs.0]
+device=/dev/disk/by-label/glassos-system0
+type=ext4
+bootname=A
+
+[slot.rootfs.1]
+device=/dev/disk/by-label/glassos-system1
+type=ext4
+bootname=B
+

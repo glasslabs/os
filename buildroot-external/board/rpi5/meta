@@ -1,0 +1,5 @@
+BOARD_ID=rpi5
+BOARD_NAME="Raspberry Pi 5"
+BOOTLOADER=uboot
+GLASSOS_COMPATIBLE=glassos-rpi5
+

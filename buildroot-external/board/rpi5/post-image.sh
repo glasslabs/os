@@ -1,19 +1,12 @@
-#!/bin/sh
-set -e
+#!/bin/bash
+# Thin shim — delegates to the shared post-image script.
+set -euo pipefail
 
 BOARD_DIR="$(dirname "$(readlink -f "$0")")"
-BINARIES_DIR="${BINARIES_DIR}"
-BUILD_DIR="${BUILD_DIR}"
+BR2_EXTERNAL_GLASSOS_PATH="$(cd "${BOARD_DIR}/../.." && pwd)"
 
-GENIMAGE_TMP="${BUILD_DIR}/genimage.tmp"
-GENIMAGE_CFG="${BOARD_DIR}/genimage.cfg"
-
-rm -rf "${GENIMAGE_TMP}"
-
-genimage \
-    --rootpath "${TARGET_DIR}" \
-    --tmppath  "${GENIMAGE_TMP}" \
-    --inputpath "${BINARIES_DIR}" \
-    --outputpath "${BINARIES_DIR}" \
-    --config "${GENIMAGE_CFG}"
+exec "${BR2_EXTERNAL_GLASSOS_PATH}/scripts/post-image.sh" \
+    "$1" \
+    "${BOARD_DIR}" \
+    "${BOARD_DIR}/glassos-hook.sh"
 

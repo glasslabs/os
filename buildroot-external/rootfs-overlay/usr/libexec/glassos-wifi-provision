@@ -1,0 +1,67 @@
+#!/bin/sh
+# glassos-wifi-provision — import WiFi credentials from /boot on first boot.
+#
+# Supports two formats placed on the FAT32 boot partition before first boot:
+#
+#   wpa_supplicant.conf  — legacy format; SSID/PSK are extracted and a
+#                          NetworkManager keyfile is generated automatically.
+#   *.nmconnection       — native NetworkManager keyfile; copied as-is.
+#
+# All imported files are removed from /boot so credentials are not left on
+# the world-readable partition.
+set -e
+
+NM_CONNECTIONS="/etc/NetworkManager/system-connections"
+BOOT="/boot"
+
+mkdir -p "${NM_CONNECTIONS}"
+
+# ── Legacy: wpa_supplicant.conf ───────────────────────────────────────────────
+if [ -f "${BOOT}/wpa_supplicant.conf" ]; then
+    SSID=$(grep -m1 'ssid=' "${BOOT}/wpa_supplicant.conf" \
+        | sed 's/.*ssid="\(.*\)"/\1/' | tr -d '[:space:]')
+    PSK=$(grep -m1 'psk=' "${BOOT}/wpa_supplicant.conf" \
+        | sed 's/.*psk="\(.*\)"/\1/' | tr -d '[:space:]')
+
+    if [ -n "${SSID}" ] && [ -n "${PSK}" ]; then
+        CONN_FILE="${NM_CONNECTIONS}/provisioned-wifi.nmconnection"
+        cat > "${CONN_FILE}" <<EOF
+[connection]
+id=provisioned-wifi
+type=wifi
+autoconnect=yes
+
+[wifi]
+mode=infrastructure
+ssid=${SSID}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=${PSK}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+addr-gen-mode=stable-privacy
+EOF
+        chmod 600 "${CONN_FILE}"
+        echo "glassos-wifi-provision: imported WiFi from wpa_supplicant.conf"
+    else
+        echo "glassos-wifi-provision: could not parse wpa_supplicant.conf — skipping"
+    fi
+
+    rm -f "${BOOT}/wpa_supplicant.conf"
+fi
+
+# ── Native: *.nmconnection files ─────────────────────────────────────────────
+for f in "${BOOT}"/*.nmconnection; do
+    [ -f "${f}" ] || continue
+    dest="${NM_CONNECTIONS}/$(basename "${f}")"
+    cp "${f}" "${dest}"
+    chmod 600 "${dest}"
+    rm -f "${f}"
+    echo "glassos-wifi-provision: imported $(basename "${f}")"
+done
+

@@ -1,0 +1,16 @@
+[Unit]
+Description=GlassOS WiFi provisioning
+Documentation=https://github.com/glasslabs/os
+# Run once after /boot is mounted so we can read provisioning files.
+After=boot.mount
+ConditionPathExists=|/boot/wpa_supplicant.conf
+ConditionPathExists=|/boot/*.nmconnection
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/glassos-wifi-provision
+
+[Install]
+WantedBy=network.target
+

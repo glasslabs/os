@@ -1,3 +1,5 @@
+name: build
+
 on:
   push:
     tags:
@@ -10,10 +12,9 @@ on:
         options: [rpi4, rpi5]
         required: false
 
-name: build
-
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build:
@@ -33,10 +34,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential bc cpio rsync unzip \
-            libncurses-dev file wget python3 \
-            python3-setuptools python3-pkg-resources \
-            libssl-dev bison flex genimage
+            automake bash bc binutils bison build-essential bzip2 cpio file \
+            flex genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget
 
       - name: Cache Buildroot downloads and host toolchain
         uses: actions/cache@v4
@@ -51,24 +51,27 @@ jobs:
         run: make build-${{ matrix.board }}
 
       - name: Build RAUC bundle
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         env:
           RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
         run: |
-          echo "$RAUC_SIGNING_KEY" > /tmp/rauc-ca.key.pem
+          echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-ca.key.pem
           rauc bundle \
-            --cert=buildroot-external/board/common/rauc/ca.cert.pem \
+            --cert=buildroot-external/ota/dev-ca.pem \
             --key=/tmp/rauc-ca.key.pem \
-            --version=${{ github.ref_name }} \
+            --version="${GITHUB_REF_NAME}" \
             buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
+            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.raucb
           rm -f /tmp/rauc-ca.key.pem
 
       - name: Rename image for release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
           cp buildroot/output/${{ matrix.board }}/images/sdcard.img \
-             glassos-${{ github.ref_name }}-${{ matrix.board }}.img
+             glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img
 
       - name: Upload image to release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -76,4 +79,6 @@ jobs:
             glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
 

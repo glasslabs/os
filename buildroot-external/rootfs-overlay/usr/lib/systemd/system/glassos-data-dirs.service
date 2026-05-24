@@ -1,0 +1,14 @@
+[Unit]
+Description=Create GlassOS data directories
+Documentation=https://github.com/glasslabs/os
+After=data.mount
+Requires=data.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'mkdir -p /data/config /data/assets /data/modules'
+
+[Install]
+WantedBy=multi-user.target
+
