@@ -15,22 +15,29 @@ HTTP API for OTA updates, log access, WiFi configuration, and config/asset/modul
 ## Architecture
 
 ```
-BusyBox init
-  ├── S30data   → mount /data (ext4), create subdirs on first boot
-  ├── S40wifi   → migrate wpa_supplicant.conf from /boot, start wpa_supplicant + dhcpcd
-  └── respawn: glass-agent  (supervisor + HTTP :8080)
-                  └── cage
-                        └── glass run ...
+systemd
+  ├── NetworkManager        → WiFi / Ethernet / DHCP
+  ├── glassos-wifi-provision → import credentials from /boot on first boot
+  ├── glassos-data-dirs     → ensure /data/{config,assets,modules} exist
+  └── glass-agent           → supervisor + HTTP :8080
+                                └── cage
+                                      └── glass run ...
 ```
 
 ### Partitions
 
+All partitions are identified by filesystem label so that device paths never need
+to be hardcoded in config, cmdline, or RAUC bundles.
+
 ```
-/dev/mmcblk0p1   FAT32   256 MB   /boot    U-Boot + kernel + RPi firmware
-/dev/mmcblk0p2   ext4    1.5 GB   /        rootfs slot A (active)
-/dev/mmcblk0p3   ext4    1.5 GB   /        rootfs slot B (RAUC target)
-/dev/mmcblk0p4   ext4    rest     /data    config, assets, modules (never wiped)
+Label               FS      Size     Mount    Purpose
+glassos-boot        FAT32   256 MB   /boot    U-Boot + kernel + RPi firmware
+glassos-system0     ext4    1.5 GB   /        rootfs slot A (active)
+glassos-system1     ext4    1.5 GB   —        rootfs slot B (RAUC target)
+glassos-data        ext4    512 MB   /data    config, assets, modules (never wiped)
 ```
+
+See [Documentation/partitions.md](Documentation/partitions.md) for details.
 
 ---
 
@@ -39,9 +46,16 @@ BusyBox init
 **Host packages (Ubuntu/Debian):**
 ```sh
 sudo apt-get install -y \
-  build-essential bc cpio rsync unzip \
-  libncurses-dev file wget python3 \
-  python3-setuptools libssl-dev bison flex genimage
+  automake bash bc binutils bison build-essential bzip2 cpio file \
+  flex genimage gettext git help2man libncurses-dev libssl-dev \
+  make patch perl python3 python3-setuptools rsync texinfo unzip wget
+```
+
+**Or use the Docker build environment** (no host dependencies needed beyond Docker):
+```sh
+make docker-build        # build the glassos-builder image once
+docker run --rm -v "$PWD":/build -v "$PWD/buildroot/dl":/cache/dl \
+  -w /build glassos-builder make build-rpi4
 ```
 
 **Clone with submodules:**
@@ -68,11 +82,26 @@ Subsequent builds with a warm cache take ~5–10 minutes.
 
 Output image: `buildroot/output/<board>/images/sdcard.img`
 
-Before building, set the Looking Glass version in the defconfig:
+### Looking Glass version
+
+Set the version to embed in the defconfig before building:
 ```
 BR2_PACKAGE_GLASS_VERSION="v1.2.3"
 ```
-Or pass it as an override: `make build-rpi4 BR2_PACKAGE_GLASS_VERSION=v1.2.3`
+Or override at build time without touching the defconfig:
+```sh
+make build-rpi4 GLASS_VERSION_OVERRIDE=v1.2.3
+```
+
+### Caching downloads and compiler output
+
+```sh
+# Keep downloads across cleans
+make build-rpi4 BR2_DL_DIR=/path/to/shared/dl
+
+# Enable ccache to speed up recompilation
+make build-rpi4 BR2_CCACHE_DIR=/path/to/ccache
+```
 
 ---
 
@@ -86,34 +115,64 @@ make flash BOARD=rpi4 DEV=/dev/sdX
 make flash BOARD=rpi4 DEV=/dev/sdX SSID="MyNetwork" PSK="mypassword"
 ```
 
-You can also write WiFi credentials manually before inserting the card:
-mount the FAT32 `/boot` partition from your Mac/PC and place a
-`wpa_supplicant.conf` file on it (standard Raspberry Pi OS format).
-It is migrated to `/data/config/` on first boot and removed from `/boot`.
-
-**Example `wpa_supplicant.conf`:**
-```
-country=GB
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-
-network={
-    ssid="MyNetwork"
-    psk="mypassword"
-}
-```
-
 ---
 
 ## First Boot
 
 1. Insert SD card, connect display and power.
 2. Find the device IP via your router's DHCP table (hostname: `glass`).
-3. SSH in: `ssh root@glass.local` (password: `glass` — change it).
-4. The `glass-agent` management API is available immediately on port 8080.
+3. SSH in: `ssh root@<ip>` (password: `glass` — change it).
+4. The `glass-agent` management API is available on port 8080.
 
-> **Note:** If no `wpa_supplicant.conf` was provided and no ethernet is connected,
-> the device has no network.
+---
+
+## WiFi Provisioning
+
+See [Documentation/wifi-provisioning.md](Documentation/wifi-provisioning.md) for full details.
+
+### Before first boot
+
+Mount the FAT32 boot partition (`glassos-boot`) from your computer and place either:
+
+**Option A — NetworkManager keyfile (recommended):**
+```ini
+# provisioned-wifi.nmconnection
+[connection]
+id=provisioned-wifi
+type=wifi
+autoconnect=yes
+
+[wifi]
+mode=infrastructure
+ssid=MyNetwork
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=mypassword
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+addr-gen-mode=stable-privacy
+```
+
+**Option B — legacy `wpa_supplicant.conf`:**
+```
+network={
+    ssid="MyNetwork"
+    psk="mypassword"
+}
+```
+
+Both formats are detected and imported on first boot; the file is then removed from `/boot`.
+
+### After first boot
+
+```sh
+nmcli device wifi connect "MyNetwork" password "mypassword"
+```
 
 ---
 
@@ -147,14 +206,11 @@ curl http://glass.local:8080/status
 
 ### View logs
 ```sh
-# Last 2000 lines
 curl http://glass.local:8080/logs
-
-# Stream live
-curl http://glass.local:8080/logs?follow=true
+curl http://glass.local:8080/logs?follow=true   # stream live
 ```
 
-### OTA update
+### OTA update (glass binary)
 ```sh
 curl -X POST http://glass.local:8080/ota \
   -H 'Content-Type: application/json' \
@@ -163,34 +219,16 @@ curl -X POST http://glass.local:8080/ota \
 
 ### Upload config
 ```sh
-curl -X POST http://glass.local:8080/config \
-  --data-binary @config.yaml
+curl -X POST http://glass.local:8080/config --data-binary @config.yaml
 ```
 
-### Upload an asset
+### Upload an asset or module
 ```sh
-curl -X POST http://glass.local:8080/assets/background.jpg \
-  --data-binary @background.jpg
+curl -X POST http://glass.local:8080/assets/background.jpg --data-binary @background.jpg
+curl -X POST http://glass.local:8080/modules/clock.wasm   --data-binary @clock.wasm
 ```
-
-### Upload a module
-```sh
-curl -X POST http://glass.local:8080/modules/clock.wasm \
-  --data-binary @clock.wasm
-```
-
-### Change WiFi
-
-Drop a `wpa_supplicant.conf` on the FAT32 `/boot` partition (visible from any OS)
-and reboot. The file is applied automatically and removed from `/boot` so the PSK is
-not left on a readable partition. Dropping a file on `/boot` always wins — use this
-to update credentials too.
-
-Alternatively SSH in and write `/data/config/wpa_supplicant.conf` directly, then run
-`wpa_cli -i wlan0 reconfigure`.
 
 ### OS update (RAUC)
-
 ```sh
 curl -X POST http://glass.local:8080/os-update \
   -H 'Content-Type: application/json' \
@@ -200,40 +238,40 @@ curl -X POST http://glass.local:8080/os-update \
 curl -X POST http://glass.local:8080/reboot
 ```
 
-### Check OS slot status
-
-```sh
-curl http://glass.local:8080/os-status
-```
-
 ---
 
 ## Buildroot Config
 
-### Inspect / change config
 ```sh
-make menuconfig-rpi4      # Buildroot packages
+make menuconfig-rpi4        # Buildroot packages
 make linux-menuconfig-rpi4  # Kernel options
-```
-
-### Save changes
-```sh
-make savedefconfig-rpi4
-```
-
-### Clean build output
-```sh
-make clean-rpi4    # one board
-make clean-all     # everything
+make savedefconfig-rpi4     # Save changes back to configs/
+make clean-rpi4             # Remove build output for one board
+make clean-all              # Remove all build output
 ```
 
 ---
 
 ## Adding a New Board
 
-1. Copy an existing board directory: `cp -r buildroot-external/board/rpi4 buildroot-external/board/myboard`
-2. Edit `config.txt`, `cmdline.txt`, `linux.config`, and `genimage.cfg` for the new hardware.
-3. Copy a defconfig: `cp buildroot-external/configs/glassos_rpi4_defconfig buildroot-external/configs/glassos_myboard_defconfig`
-4. Edit the defconfig: update `BR2_LINUX_KERNEL_DEFCONFIG`, config fragment path, and post-build/image script paths.
-5. Add `myboard` to the `BOARDS` list in `Makefile`.
-6. Add `myboard` to the matrix in `.github/workflows/build.yml`.
+See [Documentation/adding-a-board.md](Documentation/adding-a-board.md) for a full walkthrough. The short version:
+
+1. Create `buildroot-external/board/<board-id>/` with `meta`, `config.txt`, `cmdline.txt`, `linux.config`, `genimage.cfg`, and `glassos-hook.sh`.
+2. Add thin `post-build.sh` / `post-image.sh` shims that delegate to `scripts/post-build.sh` / `scripts/post-image.sh`.
+3. Copy and edit a defconfig in `buildroot-external/configs/`.
+4. Add the board ID to `BOARDS` in `Makefile`.
+5. Add the board to the matrix in `.github/workflows/build.yml` and `.github/workflows/release.yml`.
+
+---
+
+## CI / Releases
+
+| Workflow | Trigger | Output |
+|---|---|---|
+| **build** | `workflow_dispatch` | `sdcard.img` uploaded as a workflow artifact (14 days) |
+| **release** | Tag push | `sdcard.img` + signed `.raucb` uploaded to the GitHub release |
+| **agent** | Push to `main`, PRs | Lint + test the `glass-agent` Go module |
+
+The `RAUC_SIGNING_KEY` repository secret must contain the private key matching
+`buildroot-external/ota/dev-ca.pem`. The certificate expires **2026-06-23**; run
+`buildroot-external/ota/gen-dev-key.sh` to regenerate it before then.
