@@ -113,8 +113,7 @@ network={
 4. The `glass-agent` management API is available immediately on port 8080.
 
 > **Note:** If no `wpa_supplicant.conf` was provided and no ethernet is connected,
-> the device has no network. Connect ethernet, then use `POST /network/wifi` to
-> configure WiFi.
+> the device has no network.
 
 ---
 
