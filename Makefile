@@ -2,6 +2,10 @@ BOARDS       := rpi4 rpi5
 BR2_EXTERNAL := $(CURDIR)/buildroot-external
 BUILDROOT    := $(CURDIR)/buildroot
 AGENT_DIST   := $(CURDIR)/agent/dist
+GLASS_DIST   := $(CURDIR)/glass/dist
+
+# Glass version — keep in sync with BR2_PACKAGE_GLASS_VERSION in the defconfigs.
+GLASS_VERSION ?= v2.0.0
 
 # Cache directories (override on the command line or via env to enable ccache).
 BR2_DL_DIR   ?= $(BUILDROOT)/dl
@@ -20,7 +24,7 @@ DOCKER_RUN   := docker run --rm \
 .PHONY: $(addprefix linux-menuconfig-,$(BOARDS))
 .PHONY: $(addprefix savedefconfig-,$(BOARDS))
 .PHONY: $(addprefix clean-,$(BOARDS))
-.PHONY: build-agent clean-all docker-build flash test-agent help
+.PHONY: build-agent download-glass clean-all docker-build flash test-agent help
 
 # Cross-compile a static glass-agent binary for linux/arm64.
 build-agent:
@@ -35,9 +39,21 @@ build-agent:
 		.
 	@echo "==> Done"
 
-# build-rpi4 / build-rpi5 — depend on build-agent so the binary is always
-# current before Buildroot runs.
-$(addprefix build-,$(BOARDS)): build-agent
+# Download the glass binary for linux/arm64 from GitHub Releases and unzip it.
+download-glass:
+	@echo "==> Downloading glass $(GLASS_VERSION) (linux/arm64)"
+	@mkdir -p $(GLASS_DIST)
+	@curl -fsSL \
+		"https://github.com/glasslabs/looking-glass/releases/download/$(GLASS_VERSION)/glass-$(GLASS_VERSION)-linux-arm64.zip" \
+		-o "$(GLASS_DIST)/glass.zip"
+	@unzip -o "$(GLASS_DIST)/glass.zip" -d "$(GLASS_DIST)"
+	@rm -f "$(GLASS_DIST)/glass.zip"
+	@chmod +x "$(GLASS_DIST)/glass"
+	@echo "==> Done"
+
+# build-rpi4 / build-rpi5 — depend on build-agent and download-glass so both
+# binaries are always current before Buildroot runs.
+$(addprefix build-,$(BOARDS)): build-agent download-glass
 $(addprefix build-,$(BOARDS)): build-%:
 	$(MAKE) -C $(BUILDROOT) \
 		O=$(BUILDROOT)/output/$* \
@@ -100,7 +116,7 @@ $(addprefix clean-,$(BOARDS)): clean-%:
 	rm -rf $(BUILDROOT)/output/$*
 
 clean-all:
-	rm -rf $(BUILDROOT)/output
+	rm -rf $(BUILDROOT)/output $(GLASS_DIST)
 
 # Run agent unit tests
 test-agent:
@@ -114,6 +130,7 @@ help:
 	@echo ""
 	@echo "  build-rpi4/rpi5              Build SD card image for the given board"
 	@echo "  build-agent                  Cross-compile the glass-agent binary (linux/arm64)"
+	@echo "  download-glass               Download the glass binary (linux/arm64) from GitHub"
 	@echo "  menuconfig-rpi4/rpi5         Open Buildroot ncurses config"
 	@echo "  linux-menuconfig-rpi4/rpi5   Open kernel ncurses config"
 	@echo "  savedefconfig-rpi4/rpi5      Save defconfig back to configs/"
@@ -121,9 +138,10 @@ help:
 	@echo "  flash BOARD=X DEV=Y          Flash image to SD card device"
 	@echo "        [SSID=x PSK=y]         Optionally write WiFi credentials (.nmconnection)"
 	@echo "  clean-rpi4/rpi5              Remove build output for a board"
-	@echo "  clean-all                    Remove all build output"
+	@echo "  clean-all                    Remove all build output and downloaded binaries"
 	@echo "  test-agent                   Run agent unit tests"
 	@echo ""
 	@echo "  Override BR2_DL_DIR and BR2_CCACHE_DIR to enable download/build caching."
+	@echo "  Override GLASS_VERSION to download a different glass release (default: $(GLASS_VERSION))."
 	@echo "  First build: ~90 min. Subsequent builds: ~5-10 min (with cache)."
 	@echo ""
