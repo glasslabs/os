@@ -1,0 +1,4 @@
+# UNCONFIGURED FSTAB FOR BASE SYSTEM
+# Partitions are mounted via explicit systemd .mount units — see
+# usr/lib/systemd/system/boot.mount and data.mount.
+

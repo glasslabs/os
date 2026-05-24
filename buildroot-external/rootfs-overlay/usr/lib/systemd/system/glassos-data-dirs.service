@@ -1,0 +1,13 @@
+[Unit]
+Description=Create GlassOS data directories
+Documentation=https://github.com/glasslabs/os
+Requires=data.mount
+After=data.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/glassos-data-dirs
+
+[Install]
+WantedBy=multi-user.target

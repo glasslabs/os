@@ -1,0 +1,8 @@
+#!/bin/sh
+# glassos-data-dirs — create glass application directories on /data.
+
+mkdir -p /data/config
+mkdir -p /data/assets
+mkdir -p /data/modules
+mkdir -p /data/cache
+

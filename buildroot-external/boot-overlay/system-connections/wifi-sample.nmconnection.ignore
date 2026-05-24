@@ -1,0 +1,28 @@
+# Sample Wi-Fi connection profile for GlassOS headless setup.
+#
+# To activate this profile:
+#   1. Edit SSID and PSK below.
+#   2. Rename the file to remove the .ignore suffix:
+#        wifi-sample.nmconnection
+
+[connection]
+id=wifi-connection
+type=wifi
+autoconnect=true
+
+[wifi]
+hidden=true
+mode=infrastructure
+ssid=My_Wifi_Ssid
+
+[wifi-security]
+auth-alg=open
+key-mgmt=wpa-psk
+psk=super_secret_wifi_password
+
+[ipv4]
+method=auto
+
+[ipv6]
+addr-gen-mode=stable-privacy
+method=auto

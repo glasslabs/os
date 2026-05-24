@@ -1,0 +1,16 @@
+[Unit]
+Description=GlassOS network configuration
+Documentation=https://github.com/glasslabs/os
+Requires=boot.mount glassos-system-dirs.service
+After=boot.mount glassos-system-dirs.service
+Before=NetworkManager.service
+RequiresMountsFor=/etc/NetworkManager/system-connections
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/glassos-net-config
+RemainAfterExit=yes
+StandardError=journal+console
+
+[Install]
+WantedBy=glassos-bind.target

@@ -1,0 +1,18 @@
+# GlassOS systemd service presets.
+# Applied during post-build via: systemctl --root=<TARGET> preset-all
+#
+# systemd enables any unit not matched by a preset rule (PRESET_UNKNOWN →
+# PRESET_ENABLE), so this file only needs to override that default: disabling
+# services we never want, and overriding entries from systemd's own
+# 90-systemd.preset that are not appropriate for this embedded image.
+
+# Wireless — replaced by glassos-net-config that writes NM keyfiles
+disable wpa_supplicant.service
+
+# Disable the standalone networkd stack — NM owns all network management.
+# The socket is disabled explicitly to prevent socket-activation of networkd.
+disable systemd-networkd.service
+disable systemd-networkd.socket
+disable systemd-networkd-wait-online.service
+disable systemd-network-generator.service
+disable systemd-resolved.service
