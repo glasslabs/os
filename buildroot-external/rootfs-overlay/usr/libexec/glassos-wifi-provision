@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # glassos-wifi-provision — import WiFi credentials from /boot on first boot.
 #
 # Supports two formats placed on the FAT32 boot partition before first boot:
@@ -9,7 +9,7 @@
 #
 # All imported files are removed from /boot so credentials are not left on
 # the world-readable partition.
-set -e
+set -euo pipefail
 
 NM_CONNECTIONS="/etc/NetworkManager/system-connections"
 BOOT="/boot"
@@ -19,9 +19,9 @@ mkdir -p "${NM_CONNECTIONS}"
 # ── Legacy: wpa_supplicant.conf ───────────────────────────────────────────────
 if [ -f "${BOOT}/wpa_supplicant.conf" ]; then
     SSID=$(grep -m1 'ssid=' "${BOOT}/wpa_supplicant.conf" \
-        | sed 's/.*ssid="\(.*\)"/\1/' | tr -d '[:space:]')
+        | sed 's/.*ssid="\(.*\)"/\1/' | tr -d '[:space:]' || true)
     PSK=$(grep -m1 'psk=' "${BOOT}/wpa_supplicant.conf" \
-        | sed 's/.*psk="\(.*\)"/\1/' | tr -d '[:space:]')
+        | sed 's/.*psk="\(.*\)"/\1/' | tr -d '[:space:]' || true)
 
     if [ -n "${SSID}" ] && [ -n "${PSK}" ]; then
         CONN_FILE="${NM_CONNECTIONS}/provisioned-wifi.nmconnection"

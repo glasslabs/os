@@ -1,6 +1,7 @@
 #!/bin/bash
 # Shared post-image script. Called by Buildroot as:
-#   post-image.sh <TARGET_DIR> <BOARD_DIR> <HOOK_FILE>
+#   post-image.sh <BINARIES_DIR> <BOARD_DIR> <HOOK_FILE>
+# TARGET_DIR is supplied by Buildroot as an environment variable.
 # The board hook file must define glassos_post_image().
 set -euo pipefail
 

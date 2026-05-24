@@ -2,7 +2,7 @@
 Description=GlassOS management agent
 Documentation=https://github.com/glasslabs/os
 After=network.target glassos-data-dirs.service
-Wants=glassos-data-dirs.service
+Requires=glassos-data-dirs.service
 
 [Service]
 ExecStart=/usr/bin/glass-agent --addr=:8080 --data-dir=/data

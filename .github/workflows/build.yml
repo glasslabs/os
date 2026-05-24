@@ -35,12 +35,24 @@ jobs:
 
     runs-on: ubuntu-latest
 
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: agent/go.mod
+          cache: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-gomod-agent-${{ hashFiles('agent/go.sum') }}
+          restore-keys: ${{ runner.os }}-gomod-agent-
 
       - name: Install Buildroot host dependencies
         run: |

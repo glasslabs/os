@@ -62,8 +62,7 @@ func OTA(cfg *Config) http.HandlerFunc {
 			return
 		}
 
-		glassBin := "/usr/bin/glass"
-		if err = os.Rename(tmpName, glassBin); err != nil {
+		if err = os.Rename(tmpName, cfg.GlassBin); err != nil {
 			http.Error(w, fmt.Sprintf("replacing binary: %v", err), http.StatusInternalServerError)
 			return
 		}

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
@@ -126,22 +127,26 @@ func (s *supervisor) run(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec // paths are from trusted config
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	stdout, err := cmd.StdoutPipe()
+	pr, pw, err := os.Pipe()
 	if err != nil {
-		return fmt.Errorf("creating stdout pipe: %w", err)
+		return fmt.Errorf("creating output pipe: %w", err)
 	}
-	cmd.Stderr = cmd.Stdout
+	cmd.Stdout = pw
+	cmd.Stderr = pw
 
 	if err = cmd.Start(); err != nil {
+		_ = pw.Close()
+		_ = pr.Close()
 		return fmt.Errorf("starting process: %w", err)
 	}
+	_ = pw.Close() // close write end in parent so reader gets EOF when process exits
 
 	s.mu.Lock()
 	s.cmd = cmd
 	s.started = time.Now()
 	s.mu.Unlock()
 
-	scanner := bufio.NewScanner(stdout)
+	scanner := bufio.NewScanner(pr)
 	for scanner.Scan() {
 		s.ring.write(scanner.Text())
 	}

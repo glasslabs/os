@@ -1,6 +1,7 @@
 BOARDS       := rpi4 rpi5
 BR2_EXTERNAL := $(CURDIR)/buildroot-external
 BUILDROOT    := $(CURDIR)/buildroot
+AGENT_DIST   := $(CURDIR)/agent/dist
 
 # Cache directories (override on the command line or via env to enable ccache).
 BR2_DL_DIR   ?= $(BUILDROOT)/dl
@@ -19,10 +20,24 @@ DOCKER_RUN   := docker run --rm \
 .PHONY: $(addprefix linux-menuconfig-,$(BOARDS))
 .PHONY: $(addprefix savedefconfig-,$(BOARDS))
 .PHONY: $(addprefix clean-,$(BOARDS))
-.PHONY: clean-all docker-build flash test-agent help
+.PHONY: build-agent clean-all docker-build flash test-agent help
 
-# build-rpi4 / build-rpi5 — static pattern rule avoids the GNU make 3.81
-# limitation where explicit .PHONY entries shadow regular pattern rules.
+# Cross-compile a static glass-agent binary for linux/arm64.
+build-agent:
+	@echo "==> Building glass-agent (linux/arm64, static)"
+	@mkdir -p $(AGENT_DIST)
+	@cd agent && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+		go build \
+		-ldflags="-s -w -extldflags=-static" \
+		-tags "osusergo netgo" \
+		-trimpath \
+		-o $(AGENT_DIST)/glass-agent \
+		.
+	@echo "==> Done"
+
+# build-rpi4 / build-rpi5 — depend on build-agent so the binary is always
+# current before Buildroot runs.
+$(addprefix build-,$(BOARDS)): build-agent
 $(addprefix build-,$(BOARDS)): build-%:
 	$(MAKE) -C $(BUILDROOT) \
 		O=$(BUILDROOT)/output/$* \
@@ -98,6 +113,7 @@ help:
 	@echo "GlassOS build targets:"
 	@echo ""
 	@echo "  build-rpi4/rpi5              Build SD card image for the given board"
+	@echo "  build-agent                  Cross-compile the glass-agent binary (linux/arm64)"
 	@echo "  menuconfig-rpi4/rpi5         Open Buildroot ncurses config"
 	@echo "  linux-menuconfig-rpi4/rpi5   Open kernel ncurses config"
 	@echo "  savedefconfig-rpi4/rpi5      Save defconfig back to configs/"

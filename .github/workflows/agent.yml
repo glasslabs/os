@@ -28,7 +28,7 @@ jobs:
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
-          path: $(go env GOMODCACHE)
+          path: ~/go/pkg/mod
           key: ${{ runner.os }}-gomod-agent-${{ hashFiles('agent/go.sum') }}
           restore-keys: ${{ runner.os }}-gomod-agent-
 
@@ -55,7 +55,7 @@ jobs:
         id: mod-cache
         uses: actions/cache@v4
         with:
-          path: $(go env GOMODCACHE)
+          path: ~/go/pkg/mod
           key: ${{ runner.os }}-gomod-agent-${{ hashFiles('agent/go.sum') }}
           restore-keys: ${{ runner.os }}-gomod-agent-
 
@@ -77,4 +77,3 @@ jobs:
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             exit 1
           fi
-

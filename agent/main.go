@@ -39,6 +39,7 @@ func main() {
 
 	srv := newServer(*addr, &handlers.Config{
 		Supervisor: super,
+		GlassBin:   *glassBin,
 		DataDir:    *dataDir,
 		Log:        log,
 	})

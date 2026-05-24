@@ -26,6 +26,7 @@ type SupervisorInfo struct {
 // Config holds dependencies shared across all handlers.
 type Config struct {
 	Supervisor Supervisor
+	GlassBin   string
 	DataDir    string
 	Log        *logger.Logger
 }
