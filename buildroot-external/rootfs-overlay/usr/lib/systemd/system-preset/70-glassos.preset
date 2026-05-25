@@ -1,9 +1,12 @@
 # GlassOS systemd service presets.
 # Applied during post-build via: systemctl --root=<TARGET> preset-all
 
+enable boot.mount
+enable data.mount
 enable glass-agent.service
 enable glassos-data-dirs.service
+enable glassos-expand.service
 enable glassos-wifi-provision.service
 enable NetworkManager.service
 enable dropbear.service
-
+enable systemd-growfs@data.service

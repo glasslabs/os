@@ -40,8 +40,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             automake bash bc binutils bison build-essential bzip2 cpio file \
-            flex genimage gettext git help2man libncurses-dev libssl-dev \
-            make patch perl python3 python3-setuptools rsync texinfo unzip wget
+            flex genext2fs genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget xz-utils
 
       - name: Cache Buildroot downloads
         uses: actions/cache@v4
@@ -67,14 +67,14 @@ jobs:
             buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
             glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.raucb
           rm -f /tmp/rauc-ca.key.pem
-          cp buildroot/output/${{ matrix.board }}/images/sdcard.img \
-            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img
+          cp buildroot/output/${{ matrix.board }}/images/sdcard.img.xz \
+            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img.xz
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.img
+            glassos-${{ github.ref_name }}-${{ matrix.board }}.img.xz
             glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

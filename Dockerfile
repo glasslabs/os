@@ -11,9 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bison \
         build-essential \
         bzip2 \
+        ca-certificates \
         cpio \
+        curl \
         file \
         flex \
+        genext2fs \
         genimage \
         gettext \
         git \
@@ -30,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         texinfo \
         unzip \
         wget \
+        xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go for cross-compiling the glass-agent binary.

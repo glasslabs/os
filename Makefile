@@ -24,6 +24,7 @@ DOCKER_RUN   := docker run --rm \
 .PHONY: $(addprefix linux-menuconfig-,$(BOARDS))
 .PHONY: $(addprefix savedefconfig-,$(BOARDS))
 .PHONY: $(addprefix clean-,$(BOARDS))
+.PHONY: $(addprefix docker-run-,$(BOARDS))
 .PHONY: build-agent download-glass clean-all docker-build flash test-agent help
 
 # Cross-compile a static glass-agent binary for linux/arm64.
@@ -93,13 +94,26 @@ $(addprefix savedefconfig-,$(BOARDS)): savedefconfig-%:
 docker-build:
 	docker build -t $(DOCKER_IMAGE) .
 
+# docker-run-rpi4 / docker-run-rpi5 — run the full build inside the glassos-builder
+# container.  A named volume per board is used for the output directory so that
+# host-compiled Buildroot host-tools never bleed into the container (which would
+# cause "Exec format error" on a different arch).
+$(addprefix docker-run-,$(BOARDS)): docker-run-%:
+	docker run --rm \
+	    -v "$(CURDIR)":/build \
+	    -v "glassos-output-$*":/build/buildroot/output/$* \
+	    -v "$(BR2_DL_DIR)":/build/buildroot/dl \
+	    -w /build \
+	    $(DOCKER_IMAGE) \
+	    make build-$* $(if $(BR2_CCACHE_DIR),BR2_CCACHE_DIR=$(BR2_CCACHE_DIR),)
+
 # flash BOARD=rpi4 DEV=/dev/sdX [SSID=x PSK=y]
 flash:
 	@[ -n "$(BOARD)" ] || { echo "Usage: make flash BOARD=rpi4 DEV=/dev/sdX [SSID=x PSK=y]"; exit 1; }
 	@[ -n "$(DEV)" ]   || { echo "Usage: make flash BOARD=rpi4 DEV=/dev/sdX [SSID=x PSK=y]"; exit 1; }
 	@echo "==> Flashing $(BOARD) image to $(DEV) -- this will erase the device."
 	@read -p "    Continue? [y/N] " confirm && [ "$$confirm" = "y" ]
-	sudo dd if=$(BUILDROOT)/output/$(BOARD)/images/sdcard.img of=$(DEV) bs=4M conv=fsync status=progress
+	xz -dc $(BUILDROOT)/output/$(BOARD)/images/sdcard.img.xz | sudo dd of=$(DEV) bs=4M conv=fsync status=progress
 	sync
 	@if [ -n "$(SSID)" ] && [ -n "$(PSK)" ]; then \
 		echo "==> Writing WiFi credentials to boot partition"; \
@@ -128,7 +142,8 @@ help:
 	@echo ""
 	@echo "GlassOS build targets:"
 	@echo ""
-	@echo "  build-rpi4/rpi5              Build SD card image for the given board"
+	@echo "  build-rpi4/rpi5              Build SD card image for the given board (native host)"
+	@echo "  docker-run-rpi4/rpi5         Build inside Docker (avoids arch/host-tool conflicts)"
 	@echo "  build-agent                  Cross-compile the glass-agent binary (linux/arm64)"
 	@echo "  download-glass               Download the glass binary (linux/arm64) from GitHub"
 	@echo "  menuconfig-rpi4/rpi5         Open Buildroot ncurses config"

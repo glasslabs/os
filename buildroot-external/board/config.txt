@@ -1,0 +1,32 @@
+# GlassOS shared Raspberry Pi boot configuration.
+# Conditional sections apply board-specific settings automatically.
+
+# Load U-Boot as the second-stage bootloader.
+# U-Boot then loads the kernel from the active rootfs slot via boot.scr (A/B).
+kernel=u-boot.bin
+
+# Suppress boot splash and delay.
+disable_splash=1
+boot_delay=0
+
+# UART console for debugging.
+enable_uart=1
+
+# Camera/display auto-detect off (not needed for mirror use).
+camera_auto_detect=0
+display_auto_detect=0
+
+[pi4]
+# Enable DRM VC4/V3D driver (required for cage/KMS).
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+# Run in 64-bit mode.
+arm_64bit=1
+
+[pi5]
+# Pi 5 uses the vc4-kms-v3d-pi5 overlay.
+dtoverlay=vc4-kms-v3d-pi5
+max_framebuffers=2
+
+[all]
+

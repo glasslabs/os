@@ -1,0 +1,72 @@
+#!/bin/sh
+# glassos-expand — grow the glassos-data partition to fill the SD card on first boot.
+#
+# Ported from the HassOS hassos-expand script.  Runs before data.mount so the
+# partition is the right size before the filesystem is checked and mounted.
+# systemd-growfs@data.service then expands the ext4 filesystem to fill the
+# newly enlarged partition after it is mounted.
+set -e
+
+DEVICE_CHILD="$(findfs LABEL="glassos-data")"
+DEVICE_CHILD_NAME="$(basename "${DEVICE_CHILD}")"
+DEVICE_ROOT_NAME="$(lsblk -no pkname "${DEVICE_CHILD}")"
+DEVICE_ROOT="/dev/${DEVICE_ROOT_NAME}"
+PART_NUM="$(cat "/sys/class/block/${DEVICE_CHILD_NAME}/partition")"
+
+# Get partition table info as JSON.
+PART_TABLE="$(sfdisk -lqJ "${DEVICE_ROOT}")"
+PART_LABEL="$(echo "${PART_TABLE}" | jq -r '.partitiontable.label')"
+echo "[INFO] Checking if expanding glassos-data partition on ${DEVICE_CHILD} is necessary"
+
+if [ "${PART_LABEL}" = "gpt" ]; then
+    echo "[INFO] Detected GPT partition table on ${DEVICE_ROOT}"
+
+    # The GPT backup header is written at the size the image was built at.
+    # Relocate it to the physical end of the device before expanding.
+    if sfdisk --verify "${DEVICE_ROOT}" 2>&1 | grep -q "The backup GPT table is not on the end of the device."; then
+        echo "[INFO] Moving GPT backup header to the physical end of device"
+        sfdisk --relocate gpt-bak-std "${DEVICE_ROOT}"
+
+        # Reload to get correct .lastlba after relocation.
+        PART_TABLE="$(sfdisk -lqJ "${DEVICE_ROOT}")"
+    fi
+    LAST_USABLE_LBA="$(echo "${PART_TABLE}" | jq -r '.partitiontable.lastlba')"
+else
+    echo "[INFO] Detected MBR/hybrid partition table on ${DEVICE_ROOT}"
+
+    # Calculate last usable sector from device size.
+    DEVICE_SIZE="$(blockdev --getsize64 "${DEVICE_ROOT}")"
+    LAST_USABLE_LBA="$(echo "${PART_TABLE}" | jq -r "${DEVICE_SIZE} / .partitiontable.sectorsize")"
+fi
+echo "[INFO] Last usable LBA: ${LAST_USABLE_LBA}"
+
+# End LBA of the glassos-data partition.
+JQ_FILTER=".partitiontable.partitions[] | select(.node == \"${DEVICE_CHILD}\") | .start + .size"
+DATA_PARTITION_END="$(echo "${PART_TABLE}" | jq "${JQ_FILTER}")"
+echo "[INFO] glassos-data partition ends at LBA: ${DATA_PARTITION_END}"
+
+# Skip resize if there is less than 8 MiB (16384 × 512-byte sectors) of
+# free space — may be rounding from alignment.
+UNUSED_BLOCKS=$(( LAST_USABLE_LBA - DATA_PARTITION_END ))
+if [ "${UNUSED_BLOCKS}" -le "16384" ]; then
+    echo "[INFO] No resize needed"
+    exit 0
+fi
+
+echo "[INFO] Extending glassos-data (partition ${PART_NUM}) to fill ${DEVICE_ROOT}"
+echo ", +" | sfdisk --no-reread --no-tell-kernel -N "${PART_NUM}" "${DEVICE_ROOT}"
+sfdisk -V "${DEVICE_ROOT}"
+
+# Reload the kernel's view of the partition table and wait for udev.
+partx -u "${DEVICE_ROOT}"
+udevadm settle
+
+# Confirm the data device is available before returning — avoids a race
+# with data.mount which starts immediately after this service exits.
+if ! systemctl start "dev-disk-by\\x2dlabel-glassos\\x2ddata.device"; then
+    echo "[ERROR] glassos-data device not found after resize!"
+    exit 1
+fi
+
+echo "[INFO] glassos-data partition resize complete"
+

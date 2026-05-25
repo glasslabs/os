@@ -7,8 +7,7 @@ Requires=data.mount
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'mkdir -p /data/config /data/assets /data/modules'
+ExecStart=/bin/sh -c 'mkdir -p /data/config /data/assets /data/modules /data/NetworkManager/system-connections'
 
 [Install]
 WantedBy=multi-user.target
-

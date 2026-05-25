@@ -47,16 +47,23 @@ See [Documentation/partitions.md](Documentation/partitions.md) for details.
 ```sh
 sudo apt-get install -y \
   automake bash bc binutils bison build-essential bzip2 cpio file \
-  flex genimage gettext git help2man libncurses-dev libssl-dev \
+  flex genext2fs genimage gettext git help2man libncurses-dev libssl-dev \
   make patch perl python3 python3-setuptools rsync texinfo unzip wget
 ```
 
 **Or use the Docker build environment** (no host dependencies needed beyond Docker):
 ```sh
-make docker-build        # build the glassos-builder image once
-docker run --rm -v "$PWD":/build -v "$PWD/buildroot/dl":/cache/dl \
-  -w /build glassos-builder make build-rpi4
+make docker-build          # build the glassos-builder image once
+make docker-run-rpi4       # build Pi 4 image inside Docker
+make docker-run-rpi5       # build Pi 5 image inside Docker
 ```
+
+> The `docker-run-*` targets use a named Docker volume (`glassos-output-rpi4` /
+> `glassos-output-rpi5`) for Buildroot's output directory. This keeps
+> container-compiled host tools isolated from any native host build, preventing
+> `Exec format error` when switching between native and Docker builds.
+> The output image is compressed: `sdcard.img.xz`. Decompress before flashing:
+> `xz -d sdcard.img.xz`.
 
 **Clone with submodules:**
 ```sh

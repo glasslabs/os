@@ -1,0 +1,19 @@
+[Unit]
+Description=GlassOS data partition expander
+Documentation=https://github.com/glasslabs/os
+DefaultDependencies=no
+RefuseManualStart=true
+RefuseManualStop=true
+# Must run before the filesystem is mounted so the partition is the right
+# size when e2fsck checks it.
+Before=data.mount
+Requires=dev-disk-by\x2dlabel-glassos\x2ddata.device
+After=dev-disk-by\x2dlabel-glassos\x2ddata.device systemd-fsck@dev-disk-by\x2dlabel-glassos\x2ddata.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/glassos-expand
+
+[Install]
+WantedBy=local-fs.target
+

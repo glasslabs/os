@@ -11,7 +11,8 @@
 # the world-readable partition.
 set -euo pipefail
 
-NM_CONNECTIONS="/etc/NetworkManager/system-connections"
+# Connections are written to /data (writable) — NM is configured to look there.
+NM_CONNECTIONS="/data/NetworkManager/system-connections"
 BOOT="/boot"
 
 mkdir -p "${NM_CONNECTIONS}"
@@ -64,4 +65,3 @@ for f in "${BOOT}"/*.nmconnection; do
     rm -f "${f}"
     echo "glassos-wifi-provision: imported $(basename "${f}")"
 done
-

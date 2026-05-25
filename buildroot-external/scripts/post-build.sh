@@ -35,12 +35,6 @@ cp "${BR2_EXTERNAL_GLASSOS_PATH}/ota/dev-ca.pem" \
 mkdir -p "${TARGET_DIR}/boot"
 mkdir -p "${TARGET_DIR}/data"
 
-# Append label-based fstab entries (idempotent — post-build runs once).
-cat >> "${TARGET_DIR}/etc/fstab" <<'EOF'
-LABEL=glassos-boot  /boot  vfat  defaults,ro  0  2
-LABEL=glassos-data  /data  ext4  defaults      0  2
-EOF
-
 # ── Systemd preset ──────────────────────────────────────────────────────────
 # Apply service presets so our units are enabled in the target image.
 # HOST_DIR is set by Buildroot; systemctl is built as a host tool when
@@ -50,3 +44,6 @@ EOF
 # ── Board hook ──────────────────────────────────────────────────────────────
 glassos_pre_build
 
+# ── Permissions ─────────────────────────────────────────────────────────────
+chmod +x "${TARGET_DIR}/usr/libexec/glassos-expand"
+chmod +x "${TARGET_DIR}/usr/libexec/glassos-wifi-provision"

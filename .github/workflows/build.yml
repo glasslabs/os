@@ -59,8 +59,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             automake bash bc binutils bison build-essential bzip2 cpio file \
-            flex genimage gettext git help2man libncurses-dev libssl-dev \
-            make patch perl python3 python3-setuptools rsync texinfo unzip wget
+            flex genext2fs genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget xz-utils
 
       - name: Cache Buildroot downloads
         uses: actions/cache@v4
@@ -78,5 +78,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: glassos-${{ matrix.board }}
-          path: buildroot/output/${{ matrix.board }}/images/sdcard.img
+          path: buildroot/output/${{ matrix.board }}/images/sdcard.img.xz
           retention-days: 14
