@@ -1,16 +1,22 @@
 # GlassOS U-Boot boot script for Raspberry Pi 4.
 #
-# Partition layout (MBR+GPT hybrid):
-#   1 – boot         (VFAT, 256 MiB)  – this script lives here as boot.scr
-#   2 – system0      (ext4, 1536 MiB) – slot A rootfs (kernel at /boot/Image)
-#   3 – system1      (ext4, 1536 MiB) – slot B rootfs (kernel at /boot/Image)
-#   4 – bootstate    (raw,   8 MiB)   – U-Boot env for A/B state
-#   5 – data         (ext4, 512 MiB)  – persistent data
+# Partition layout (hybrid MBR+GPT):
+#   1 – boot         (VFAT, 32 MiB)     – this script lives here as boot.scr  [MBR]
+#   2 – kernel0      (squashfs, 24 MiB) – slot A kernel image (Image)
+#   3 – system0      (erofs, 256 MiB)   – slot A rootfs
+#   4 – kernel1      (squashfs, 24 MiB) – slot B kernel image
+#   5 – system1      (erofs, 256 MiB)   – slot B rootfs
+#   6 – bootstate    (raw, 8 MiB)       – U-Boot env for A/B state
+#   7 – overlay      (ext4, 96 MiB)     – writable overlay
+#   8 – data         (ext4, 1280 MiB)   – persistent data
+#
+# U-Boot is compiled with CONFIG_DOS_PARTITION=n so it reads GPT exclusively.
+# The RPi 4 boot ROM still finds the FAT partition via the hybrid MBR entry.
 #
 # The boot state (BOOT_ORDER, BOOT_A_LEFT, BOOT_B_LEFT, MACHINE_ID) is stored
 # as a U-Boot environment block at the start of the bootstate partition.
 
-part start ${devtype} ${devnum} 4 dev_bootstate
+part start ${devtype} ${devnum} 6 dev_bootstate
 ${devtype} dev ${devnum}
 
 setenv loadbootstate " \
@@ -31,12 +37,12 @@ test -n "${BOOT_B_LEFT}" || setenv BOOT_B_LEFT 3
 # Allows ConditionFirstBoot= in systemd units on the very first boot.
 test -n "${MACHINE_ID}" || setenv BOOT_CONDITION "systemd.condition-first-boot=true"
 
-# GlassOS per-slot root args (read-only rootfs).
-setenv bootargs_a "root=LABEL=glassos-system0 ro rauc.slot=A"
-setenv bootargs_b "root=LABEL=glassos-system1 ro rauc.slot=B"
+# GlassOS per-slot root args (erofs, read-only rootfs identified by PARTUUID).
+setenv bootargs_a "root=PARTUUID=8d3d53e3-6d49-4c38-8349-aff6859e82fd ro"
+setenv bootargs_b "root=PARTUUID=a3ec664e-32ce-4665-95ea-7ae90ce9aa20 ro"
 
 # Common kernel args shared by both slots.
-setenv bootargs_glass "console=serial0,115200 console=tty1 rootfstype=ext4 rootwait cgroup_enable=memory fsck.repair=yes systemd.machine_id=${MACHINE_ID} ${BOOT_CONDITION}"
+setenv bootargs_glass "rootwait systemd.machine_id=${MACHINE_ID} cgroup_enable=memory fsck.repair=yes ${BOOT_CONDITION}"
 
 # Preserve any bootargs injected by the GPU firmware (video params, serial, …).
 setenv bootargs_rpi
@@ -52,16 +58,16 @@ for BOOT_SLOT in "${BOOT_ORDER}"; do
     if test ${BOOT_A_LEFT} -gt 0; then
       setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1
       echo "Trying boot slot A, ${BOOT_A_LEFT} attempt(s) remaining..."
-      if load ${devtype} ${devnum}:2 ${kernel_addr_r} /boot/Image; then
-        setenv bootargs "${bootargs_rpi} ${bootargs_glass} ${bootargs_a}"
+      if load ${devtype} ${devnum}:2 ${kernel_addr_r} Image; then
+        setenv bootargs "${bootargs_rpi} ${bootargs_glass} ${bootargs_a} rauc.slot=A"
       fi
     fi
   elif test "x${BOOT_SLOT}" = "xB"; then
     if test ${BOOT_B_LEFT} -gt 0; then
       setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1
       echo "Trying boot slot B, ${BOOT_B_LEFT} attempt(s) remaining..."
-      if load ${devtype} ${devnum}:3 ${kernel_addr_r} /boot/Image; then
-        setenv bootargs "${bootargs_rpi} ${bootargs_glass} ${bootargs_b}"
+      if load ${devtype} ${devnum}:4 ${kernel_addr_r} Image; then
+        setenv bootargs "${bootargs_rpi} ${bootargs_glass} ${bootargs_b} rauc.slot=B"
       fi
     fi
   fi
@@ -83,4 +89,3 @@ booti ${kernel_addr_r} - ${fdt_org}
 
 echo "booti failed — resetting."
 reset
-

@@ -1,0 +1,9 @@
+GLASSOS_NAME="GlassOS"
+GLASSOS_ID="glassos"
+
+# Bump for each release.  The full version string is MAJOR.MINOR[.PATCH].
+# Override by passing GLASSOS_VERSION=x.y.z on the make command line.
+GLASSOS_VERSION_MAJOR="0"
+GLASSOS_VERSION_MINOR="1"
+GLASSOS_VERSION_PATCH="dev"
+

@@ -52,29 +52,40 @@ jobs:
           key: buildroot-${{ matrix.board }}-${{ hashFiles(format('buildroot-external/configs/glassos_{0}_defconfig', matrix.board)) }}
           restore-keys: buildroot-${{ matrix.board }}-
 
-      - name: Build image
-        run: make build-${{ matrix.board }}
-
-      - name: Build RAUC bundle and rename image
+      - name: Write RAUC signing key
         env:
           RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
         run: |
-          echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-ca.key.pem
-          rauc bundle \
-            --cert=buildroot-external/ota/dev-ca.pem \
-            --key=/tmp/rauc-ca.key.pem \
-            --version="${GITHUB_REF_NAME}" \
-            buildroot/output/${{ matrix.board }}/images/rootfs.ext4 \
-            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.raucb
-          rm -f /tmp/rauc-ca.key.pem
-          cp buildroot/output/${{ matrix.board }}/images/sdcard.img.xz \
-            glassos-"${GITHUB_REF_NAME}"-${{ matrix.board }}.img.xz
+          if [ -n "${RAUC_SIGNING_KEY}" ]; then
+            echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-signing.key.pem
+            echo "GLASSOS_RAUC_KEY=/tmp/rauc-signing.key.pem" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build image and RAUC bundle
+        run: |
+          make build-${{ matrix.board }} GLASSOS_VERSION=${{ github.ref_name }}
+
+      - name: Rename release artefacts
+        run: |
+          VERSION="${{ github.ref_name }}"
+          BOARD="${{ matrix.board }}"
+          IMAGES="buildroot/output/${BOARD}/images"
+
+          cp "${IMAGES}/sdcard.img.xz" \
+             "glassos-${BOARD}-${VERSION}.img.xz"
+
+          cp "${IMAGES}/glassos-${BOARD}-${VERSION}.raucb" \
+             "glassos-${BOARD}-${VERSION}.raucb"
+
+      - name: Clean up signing key
+        if: always()
+        run: rm -f /tmp/rauc-signing.key.pem
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.img.xz
-            glassos-${{ github.ref_name }}-${{ matrix.board }}.raucb
+            glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
+            glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

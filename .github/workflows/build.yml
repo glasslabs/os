@@ -78,5 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: glassos-${{ matrix.board }}
-          path: buildroot/output/${{ matrix.board }}/images/sdcard.img.xz
+          path: |
+            buildroot/output/${{ matrix.board }}/images/sdcard.img.xz
+            buildroot/output/${{ matrix.board }}/images/*.raucb
           retention-days: 14

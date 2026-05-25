@@ -12,6 +12,9 @@ HOOK_FILE="${3}"
 # directory containing this script's parent.
 BR2_EXTERNAL_GLASSOS_PATH="${BR2_EXTERNAL_GLASSOS_PATH:-$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)}"
 
+# Load project-level identity.
+# shellcheck source=/dev/null
+. "${BR2_EXTERNAL_GLASSOS_PATH}/meta"
 # Load board identity.
 # shellcheck source=/dev/null
 . "${BOARD_DIR}/meta"
@@ -34,6 +37,7 @@ cp "${BR2_EXTERNAL_GLASSOS_PATH}/ota/dev-ca.pem" \
 # ── Mount points ────────────────────────────────────────────────────────────
 mkdir -p "${TARGET_DIR}/boot"
 mkdir -p "${TARGET_DIR}/data"
+mkdir -p "${TARGET_DIR}/overlay"
 
 # ── Systemd preset ──────────────────────────────────────────────────────────
 # Apply service presets so our units are enabled in the target image.

@@ -6,12 +6,27 @@ statusfile=/data/rauc.db
 [keyring]
 path=/etc/rauc/keyring.pem
 
+[slot.boot.0]
+device=/dev/disk/by-partlabel/glassos-boot
+type=vfat
+allow-mounted=true
+
+[slot.kernel.0]
+device=/dev/disk/by-partlabel/glassos-kernel0
+type=raw
+bootname=A
+
 [slot.rootfs.0]
 device=/dev/disk/by-partlabel/glassos-system0
-type=ext4
-bootname=A
+type=raw
+parent=kernel.0
+
+[slot.kernel.1]
+device=/dev/disk/by-partlabel/glassos-kernel1
+type=raw
+bootname=B
 
 [slot.rootfs.1]
 device=/dev/disk/by-partlabel/glassos-system1
-type=ext4
-bootname=B
+type=raw
+parent=kernel.1

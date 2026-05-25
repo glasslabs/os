@@ -11,8 +11,7 @@ Wants=systemd-fsck@dev-disk-by\x2dlabel-glass\x2dboot.service
 What=/dev/disk/by-label/glass-boot
 Where=/boot
 Type=vfat
-Options=defaults
+Options=ro,noatime
 
 [Install]
 WantedBy=local-fs.target
-

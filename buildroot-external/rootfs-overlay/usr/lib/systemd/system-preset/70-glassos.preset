@@ -3,6 +3,7 @@
 
 enable boot.mount
 enable data.mount
+enable overlay.mount
 enable glass-agent.service
 enable glassos-data-dirs.service
 enable glassos-expand.service
