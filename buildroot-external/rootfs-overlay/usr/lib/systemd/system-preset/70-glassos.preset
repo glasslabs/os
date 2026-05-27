@@ -1,15 +1,18 @@
 # GlassOS systemd service presets.
 # Applied during post-build via: systemctl --root=<TARGET> preset-all
+#
+# systemd enables any unit not matched by a preset rule (PRESET_UNKNOWN →
+# PRESET_ENABLE), so this file only needs to override that default: disabling
+# services we never want, and overriding entries from systemd's own
+# 90-systemd.preset that are not appropriate for this embedded image.
 
-enable boot.mount
-enable data.mount
-enable overlay.mount
-enable glass-agent.service
-enable glassos-data-dirs.service
-enable glassos-bind.target
-enable glassos-expand.service
-enable glassos-wifi-provision.service
-enable NetworkManager.service
+# Wireless — replaced by glassos-wifi-provision that writes NM keyfiles
 disable wpa_supplicant.service
-enable dropbear.service
-enable systemd-growfs@data.service
+
+# systemd's 90-systemd.preset enables these; disable on this embedded image
+# because we use NetworkManager for all network management and do not need
+# the standalone networkd/resolved stack.
+disable systemd-networkd.service
+disable systemd-networkd-wait-online.service
+disable systemd-network-generator.service
+disable systemd-resolved.service

@@ -4,7 +4,7 @@ Documentation=https://github.com/glasslabs/os
 # Run after system dirs are created and the connections bind-mount is up,
 # but strictly before NetworkManager so any imported profile is present when NM
 # does its startup autoconnect scan.
-Requires=glassos-system-dirs.service
+Requires=glassos-system-dirs.service boot.mount
 After=glassos-system-dirs.service boot.mount
 RequiresMountsFor=/etc/NetworkManager/system-connections
 Before=NetworkManager.service
