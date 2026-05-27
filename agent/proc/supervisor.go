@@ -1,79 +1,78 @@
-package main
+// Package proc manages the supervised glass child process.
+package proc
 
 import (
 	"bufio"
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
-	"github.com/glasslabs/os/agent/handlers"
+	"github.com/glasslabs/os/agent/internal/exec"
 	"github.com/hamba/logger/v2"
 	lctx "github.com/hamba/logger/v2/ctx"
 )
 
 const ringSize = 2000
 
-// supervisor starts and supervises the glass process, capturing its output.
-type supervisor struct {
-	glassBin string
-	dataDir  string
+// Info holds a snapshot of supervisor state.
+type Info struct {
+	PID      int
+	Restarts int32
+	Started  time.Time
+}
+
+// Supervisor starts and supervises a process, capturing its output.
+type Supervisor struct {
+	exe *exec.Executable
 
 	mu       sync.Mutex
-	cmd      *exec.Cmd
+	cancelFn func()
 	started  time.Time
 	restarts atomic.Int32
 
 	ring *ringBuffer
 
-	stopCh chan struct{}
-
 	log *logger.Logger
 }
 
-func newSupervisor(glassBin, dataDir string, log *logger.Logger) *supervisor {
-	return &supervisor{
-		glassBin: glassBin,
-		dataDir:  dataDir,
-		ring:     newRingBuffer(ringSize),
-		stopCh:   make(chan struct{}),
-		log:      log,
+// New returns a new Supervisor.
+func New(exe *exec.Executable, log *logger.Logger) *Supervisor {
+	s := &Supervisor{
+		exe:  exe,
+		ring: newRingBuffer(ringSize),
+		log:  log,
 	}
+	return s
 }
 
 // Start begins the supervision loop in a background goroutine.
-func (s *supervisor) Start(ctx context.Context) error {
+func (s *Supervisor) Start(ctx context.Context) error {
 	go s.loop(ctx)
 	return nil
 }
 
 // Restart sends SIGTERM to the running process. The supervision loop restarts it.
-func (s *supervisor) Restart() {
+func (s *Supervisor) Restart() {
 	s.mu.Lock()
-	cmd := s.cmd
+	cancel := s.cancelFn
 	s.mu.Unlock()
 
-	if cmd != nil && cmd.Process != nil {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
+	if cancel != nil {
+		cancel()
 	}
 }
 
 // Info returns a snapshot of current supervisor state.
-func (s *supervisor) Info() handlers.SupervisorInfo {
+func (s *Supervisor) Info() Info {
 	s.mu.Lock()
-	pid := 0
-	if s.cmd != nil && s.cmd.Process != nil {
-		pid = s.cmd.Process.Pid
-	}
+	pid := s.exe.PID()
 	started := s.started
 	s.mu.Unlock()
 
-	return handlers.SupervisorInfo{
+	return Info{
 		PID:      pid,
 		Restarts: s.restarts.Load(),
 		Started:  started,
@@ -81,16 +80,16 @@ func (s *supervisor) Info() handlers.SupervisorInfo {
 }
 
 // Lines returns the current ring buffer contents in chronological order.
-func (s *supervisor) Lines() []string {
+func (s *Supervisor) Lines() []string {
 	return s.ring.lines()
 }
 
 // Follow returns a channel that receives new log lines until ctx is cancelled.
-func (s *supervisor) Follow(ctx context.Context) <-chan string {
+func (s *Supervisor) Follow(ctx context.Context) <-chan string {
 	return s.ring.follow(ctx)
 }
 
-func (s *supervisor) loop(ctx context.Context) {
+func (s *Supervisor) loop(ctx context.Context) {
 	for {
 		if ctx.Err() != nil {
 			return
@@ -113,54 +112,49 @@ func (s *supervisor) loop(ctx context.Context) {
 	}
 }
 
-func (s *supervisor) run(ctx context.Context) error {
-	args := []string{
-		"/usr/bin/cage", "--",
-		s.glassBin, "run",
-		"--config", filepath.Join(s.dataDir, "config", "config.yaml"),
-		"--secrets", filepath.Join(s.dataDir, "config", "secrets.yaml"),
-		"--assets", filepath.Join(s.dataDir, "assets"),
-		"--modules", filepath.Join(s.dataDir, "modules"),
-		"--log.format=logfmt",
-	}
-
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...) //nolint:gosec // paths are from trusted config
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
+func (s *Supervisor) run(ctx context.Context) error {
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		return fmt.Errorf("creating output pipe: %w", err)
 	}
-	cmd.Stdout = pw
-	cmd.Stderr = pw
 
-	if err = cmd.Start(); err != nil {
-		_ = pw.Close()
-		_ = pr.Close()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errCh, err := s.exe.Run(ctx, pw, pw)
+	if err != nil {
 		return fmt.Errorf("starting process: %w", err)
 	}
-	_ = pw.Close() // close write end in parent so reader gets EOF when process exits
 
 	s.mu.Lock()
-	s.cmd = cmd
+	s.cancelFn = cancel
 	s.started = time.Now()
 	s.mu.Unlock()
 
-	scanner := bufio.NewScanner(pr)
-	for scanner.Scan() {
-		s.ring.write(scanner.Text())
-	}
+	doneCh := make(chan struct{}, 0)
+	go func() {
+		defer close(doneCh)
 
-	err = cmd.Wait()
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			s.ring.write(scanner.Text())
+		}
+	}()
+
+	err = <-errCh
 
 	s.mu.Lock()
-	s.cmd = nil
+	s.cancelFn = nil
 	s.mu.Unlock()
+
+	_ = pw.Close()
+	_ = pr.Close()
+
+	<-doneCh
 
 	return err
 }
 
-// ringBuffer is a fixed-capacity circular log buffer safe for concurrent use.
 type ringBuffer struct {
 	mu    sync.Mutex
 	buf   []string

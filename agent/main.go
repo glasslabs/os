@@ -3,13 +3,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
-	"github.com/glasslabs/os/agent/handlers"
+	"github.com/glasslabs/os/agent/api"
+	"github.com/glasslabs/os/agent/internal/exec"
+	"github.com/glasslabs/os/agent/proc"
 	"github.com/hamba/logger/v2"
 	lctx "github.com/hamba/logger/v2/ctx"
 )
@@ -35,21 +40,37 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	super := newSupervisor(*glassBin, *dataDir, log)
+	exe := &exec.Executable{
+		Path: "/usr/bin/cage",
+		Args: []string{"--",
+			*glassBin, "run",
+			"--config", filepath.Join(*dataDir, "config", "config.yaml"),
+			"--secrets", filepath.Join(*dataDir, "config", "secrets.yaml"),
+			"--assets", filepath.Join(*dataDir, "assets"),
+			"--modules", filepath.Join(*dataDir, "modules")},
+		SysProcAttr: &syscall.SysProcAttr{Setpgid: true},
+	}
+	super := proc.New(exe, log)
 
-	srv := newServer(*addr, &handlers.Config{
-		Supervisor: super,
-		GlassBin:   *glassBin,
-		DataDir:    *dataDir,
-		Log:        log,
-	})
+	apiSrv := api.NewServer(*addr, super, *glassBin, *dataDir, log)
 
 	if err = super.Start(ctx); err != nil {
 		log.Error("Could not start supervisor", lctx.Err(err))
 		os.Exit(1)
 	}
 
-	if err = srv.Run(ctx); err != nil {
+	srv := &http.Server{
+		Addr:    *addr,
+		Handler: apiSrv,
+	}
+	go func() {
+		<-ctx.Done()
+		_ = srv.Shutdown(context.WithoutCancel(ctx))
+	}()
+
+	log.Info("Starting server", lctx.Str("addr", *addr))
+
+	if err = srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		log.Error("Could not run server", lctx.Err(err))
 		os.Exit(1)
 	}
