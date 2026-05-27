@@ -1,0 +1,17 @@
+[Unit]
+Description=Persistent hostname
+Documentation=https://github.com/glasslabs/os
+Requires=glassos-system-dirs.service
+After=glassos-system-dirs.service
+Before=network.target
+
+[Mount]
+What=/data/hostname
+Where=/etc/hostname
+Type=none
+Options=bind
+LazyUnmount=yes
+
+[Install]
+WantedBy=glassos-bind.target
+

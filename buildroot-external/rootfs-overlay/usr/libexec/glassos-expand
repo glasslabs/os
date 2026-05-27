@@ -69,4 +69,3 @@ if ! systemctl start "dev-disk-by\\x2dlabel-glassos\\x2ddata.device"; then
 fi
 
 echo "[INFO] glassos-data partition resize complete"
-

@@ -4,11 +4,11 @@ Documentation=https://github.com/glasslabs/os
 DefaultDependencies=no
 RefuseManualStart=true
 RefuseManualStop=true
+Requires=dev-disk-by\x2dlabel-glassos\x2ddata.device
 # Must run before the filesystem is mounted so the partition is the right
 # size when e2fsck checks it.
-Before=data.mount
-Requires=dev-disk-by\x2dlabel-glassos\x2ddata.device
 After=dev-disk-by\x2dlabel-glassos\x2ddata.device systemd-fsck@dev-disk-by\x2dlabel-glassos\x2ddata.service
+Before=data.mount
 
 [Service]
 Type=oneshot

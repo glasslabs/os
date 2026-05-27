@@ -1,5 +1,5 @@
 [Unit]
-Description=Create GlassOS data directories
+Description=Create GlassOS system directories
 Documentation=https://github.com/glasslabs/os
 Requires=data.mount
 After=data.mount
@@ -7,7 +7,9 @@ After=data.mount
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/libexec/glassos-data-dirs
+ExecStart=/usr/libexec/glassos-system-dirs
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=glassos-bind.target
+
+

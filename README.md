@@ -17,7 +17,7 @@ HTTP API for OTA updates, log access, WiFi configuration, and config/asset/modul
 ```
 systemd
   ├── NetworkManager        → WiFi / Ethernet / DHCP
-  ├── glassos-wifi-provision → import credentials from /boot on first boot
+  ├── glassos-wifi-provision → import credentials from /boot on first boot (runs before NM)
   ├── glassos-data-dirs     → ensure /data/{config,assets,modules} exist
   └── glass-agent           → supervisor + HTTP :8080
                                 └── cage
@@ -89,16 +89,31 @@ Subsequent builds with a warm cache take ~5–10 minutes.
 
 Output image: `buildroot/output/<board>/images/sdcard.img`
 
-### Looking Glass version
+### Looking Glass version and variant
 
-Set the version to embed in the defconfig before building:
-```
-BR2_PACKAGE_GLASS_VERSION="v1.2.3"
-```
-Or override at build time without touching the defconfig:
+Two Makefile variables control which `glass` binary is downloaded and embedded:
+
+| Variable | Default   | Description |
+|---|-----------|---|
+| `GLASS_VERSION` | `v2.0.1`  | looking-glass release tag to download |
+| `GLASS_VARIANT` | `wayland` | Gio backend: `wayland` (no X11 dep), `x11`, or `full` |
+
+Both must be kept in sync with their Buildroot counterparts in the defconfig
+(`BR2_PACKAGE_GLASS_VERSION`, `BR2_PACKAGE_GLASS_VARIANT`) so that Buildroot
+tracks the correct version metadata.
+
+Override on the command line without touching any file:
 ```sh
-make build-rpi4 GLASS_VERSION_OVERRIDE=v1.2.3
+make build-rpi4 GLASS_VERSION=v2.1.0 GLASS_VARIANT=wayland
 ```
+
+Or update the defaults in `Makefile` (and the matching `BR2_PACKAGE_GLASS_*`
+values in `buildroot-external/configs/glassos_<board>_defconfig`) before
+pushing a release tag so CI picks them up automatically.
+
+> **GlassOS uses the `wayland` variant** — it boots directly into cage (a pure
+> Wayland compositor) with no X11 stack present, so `wayland` is the correct
+> choice. Use `x11` or `full` only for custom images that include an X server.
 
 ### Caching downloads and compiler output
 
@@ -173,7 +188,10 @@ network={
 }
 ```
 
-Both formats are detected and imported on first boot; the file is then removed from `/boot`.
+Both formats are detected and imported on first boot; the file is then removed from
+`/boot`. On subsequent boots `glassos-wifi-provision` runs as a fast no-op (nothing
+to import) and still completes before NetworkManager starts, ensuring the ordering
+is always correct.
 
 ### After first boot
 
@@ -221,7 +239,7 @@ curl http://glass.local:8080/logs?follow=true   # stream live
 ```sh
 curl -X POST http://glass.local:8080/ota \
   -H 'Content-Type: application/json' \
-  -d '{"url":"https://github.com/glasslabs/looking-glass/releases/download/v1.2.3/glass-v1.2.3-linux-arm64.zip","sha256":"<hex>"}'
+  -d '{"url":"https://github.com/glasslabs/looking-glass/releases/download/v1.2.3/glass-v1.2.3-linux-arm64-wayland.zip","sha256":"<hex>"}'
 ```
 
 ### Upload config
@@ -279,6 +297,17 @@ See [Documentation/adding-a-board.md](Documentation/adding-a-board.md) for a ful
 | **release** | Tag push | `sdcard.img` + signed `.raucb` uploaded to the GitHub release |
 | **agent** | Push to `main`, PRs | Lint + test the `glass-agent` Go module |
 
+The **build** workflow accepts optional `glass_version` and `glass_variant` inputs
+(defaulting to the Makefile values) so any combination can be tested without
+changing code.
+
+For a **release**, update `GLASS_VERSION` (and optionally `GLASS_VARIANT`) in
+`Makefile` and the matching `BR2_PACKAGE_GLASS_*` values in the defconfigs, then
+push a tag. CI uses the Makefile defaults to download the correct binary.
+
 The `RAUC_SIGNING_KEY` repository secret must contain the private key matching
-`buildroot-external/ota/dev-ca.pem`. The certificate expires **2026-06-23**; run
-`buildroot-external/ota/gen-dev-key.sh` to regenerate it before then.
+`buildroot-external/ota/dev-ca.pem`. CI writes it to a temporary file, passes it
+to Buildroot via `GLASSOS_RAUC_KEY`, and removes it after the build. Local builds
+fall back to the committed dev key automatically. The certificate expires
+**2026-06-23**; run `buildroot-external/ota/gen-dev-key.sh` to regenerate it
+before then.

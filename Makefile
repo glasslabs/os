@@ -5,7 +5,11 @@ AGENT_DIST   := $(CURDIR)/agent/dist
 GLASS_DIST   := $(CURDIR)/glass/dist
 
 # Glass version — keep in sync with BR2_PACKAGE_GLASS_VERSION in the defconfigs.
-GLASS_VERSION ?= v2.0.0
+GLASS_VERSION ?= v2.0.1
+# Glass variant — the Gio window-system backend compiled into the binary.
+# Choices: wayland (default, no X11 dep), x11, full.
+# Must match the variant suffix used in the looking-glass GitHub release archive.
+GLASS_VARIANT ?= wayland
 
 # GlassOS image version — passed through to the RAUC bundle manifest and image
 # file names.  Override on the command line (e.g. GLASSOS_VERSION=1.0.0) or let
@@ -49,10 +53,10 @@ build-agent:
 
 # Download the glass binary for linux/arm64 from GitHub Releases and unzip it.
 download-glass:
-	@echo "==> Downloading glass $(GLASS_VERSION) (linux/arm64)"
+	@echo "==> Downloading glass $(GLASS_VERSION) (linux/arm64, $(GLASS_VARIANT))"
 	@mkdir -p $(GLASS_DIST)
 	@curl -fsSL \
-		"https://github.com/glasslabs/looking-glass/releases/download/$(GLASS_VERSION)/glass-$(GLASS_VERSION)-linux-arm64.zip" \
+		"https://github.com/glasslabs/looking-glass/releases/download/$(GLASS_VERSION)/glass-$(GLASS_VERSION)-linux-arm64-$(GLASS_VARIANT).zip" \
 		-o "$(GLASS_DIST)/glass.zip"
 	@unzip -o "$(GLASS_DIST)/glass.zip" -d "$(GLASS_DIST)"
 	@rm -f "$(GLASS_DIST)/glass.zip"
@@ -115,7 +119,9 @@ $(addprefix docker-run-,$(BOARDS)): docker-run-%:
 	    $(DOCKER_IMAGE) \
 	    make build-$* \
 	        $(if $(BR2_CCACHE_DIR),BR2_CCACHE_DIR=$(BR2_CCACHE_DIR),) \
-	        $(if $(GLASSOS_VERSION),GLASSOS_VERSION=$(GLASSOS_VERSION),)
+	        $(if $(GLASSOS_VERSION),GLASSOS_VERSION=$(GLASSOS_VERSION),) \
+	        GLASS_VERSION=$(GLASS_VERSION) \
+	        GLASS_VARIANT=$(GLASS_VARIANT)
 
 # docker-uboot-rebuild-rpi4 / docker-uboot-rebuild-rpi5 — force U-Boot recompile
 # inside the Docker container (use after uboot.config or uboot-boot.ush change).
@@ -204,6 +210,7 @@ help:
 	@echo ""
 	@echo "  Override BR2_DL_DIR and BR2_CCACHE_DIR to enable download/build caching."
 	@echo "  Override GLASS_VERSION to download a different glass release (default: $(GLASS_VERSION))."
+	@echo "  Override GLASS_VARIANT to select the Gio backend: wayland (default), x11, full."
 	@echo "  Override GLASSOS_VERSION to set the OTA bundle version (default: from buildroot-external/meta)."
 	@echo "  First build: ~90 min. Subsequent builds: ~5-10 min (with cache)."
 	@echo ""

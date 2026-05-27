@@ -1,11 +1,13 @@
 [Unit]
 Description=GlassOS WiFi provisioning
 Documentation=https://github.com/glasslabs/os
-# Run after data dirs are created (connections go to /data) and /boot is mounted.
-After=glassos-data-dirs.service boot.mount
-Requires=glassos-data-dirs.service
-ConditionPathExists=|/boot/wpa_supplicant.conf
-ConditionPathExists=|/boot/*.nmconnection
+# Run after system dirs are created and the connections bind-mount is up,
+# but strictly before NetworkManager so any imported profile is present when NM
+# does its startup autoconnect scan.
+Requires=glassos-system-dirs.service
+After=glassos-system-dirs.service boot.mount
+RequiresMountsFor=/etc/NetworkManager/system-connections
+Before=NetworkManager.service
 
 [Service]
 Type=oneshot
@@ -13,4 +15,8 @@ RemainAfterExit=yes
 ExecStart=/usr/libexec/glassos-wifi-provision
 
 [Install]
-WantedBy=network.target
+# multi-user.target places this in the same activation phase as NetworkManager.
+# The Before=NetworkManager.service ordering above is only effective when both
+# units share an activation transaction — network.target (the previous value) is
+# reached *after* NM has already started, making Before= unreachable.
+WantedBy=multi-user.target

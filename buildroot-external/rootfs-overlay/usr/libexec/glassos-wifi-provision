@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # glassos-wifi-provision — import WiFi credentials from /boot on first boot.
 #
 # Supports two formats placed on the FAT32 boot partition before first boot:
@@ -15,6 +15,11 @@ set -euo pipefail
 NM_CONNECTIONS="/data/NetworkManager/system-connections"
 BOOT="/boot"
 
+# Remount /boot rw for the duration of this script; restore ro on exit
+# regardless of success or failure.
+mount -o remount,rw "${BOOT}"
+trap 'mount -o remount,ro "${BOOT}"' EXIT
+
 mkdir -p "${NM_CONNECTIONS}"
 
 # ── Legacy: wpa_supplicant.conf ───────────────────────────────────────────────
@@ -30,7 +35,7 @@ if [ -f "${BOOT}/wpa_supplicant.conf" ]; then
 [connection]
 id=provisioned-wifi
 type=wifi
-autoconnect=yes
+autoconnect=true
 
 [wifi]
 mode=infrastructure

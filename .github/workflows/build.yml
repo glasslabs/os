@@ -8,6 +8,16 @@ on:
         type: choice
         options: ['', rpi4, rpi5]
         required: false
+      glass_version:
+        description: "Glass binary version to embed (e.g. v2.0.0; leave blank to use Makefile default)"
+        type: string
+        required: false
+      glass_variant:
+        description: "Glass binary variant to embed"
+        type: choice
+        options: [wayland, x11, full]
+        required: false
+        default: wayland
 
 permissions:
   contents: read
@@ -71,8 +81,27 @@ jobs:
           key: buildroot-${{ matrix.board }}-${{ hashFiles(format('buildroot-external/configs/glassos_{0}_defconfig', matrix.board)) }}
           restore-keys: buildroot-${{ matrix.board }}-
 
+      - name: Write RAUC signing key
+        env:
+          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
+        run: |
+          if [ -n "${RAUC_SIGNING_KEY}" ]; then
+            echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-signing.key.pem
+            echo "GLASSOS_RAUC_KEY=/tmp/rauc-signing.key.pem" >> "$GITHUB_ENV"
+          fi
+
       - name: Build image
-        run: make build-${{ matrix.board }}
+        run: |
+          make build-${{ matrix.board }} \
+            ${GLASS_VERSION:+GLASS_VERSION="$GLASS_VERSION"} \
+            GLASS_VARIANT="${GLASS_VARIANT}"
+        env:
+          GLASS_VERSION: ${{ inputs.glass_version }}
+          GLASS_VARIANT: ${{ inputs.glass_variant || 'wayland' }}
+
+      - name: Clean up signing key
+        if: always()
+        run: rm -f /tmp/rauc-signing.key.pem
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4

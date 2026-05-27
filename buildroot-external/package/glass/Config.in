@@ -10,6 +10,14 @@ config BR2_PACKAGE_GLASS_VERSION
 	default "v0.0.0"
 	help
 	  The looking-glass release tag to download (e.g. v1.0.0).
+	  Must match GLASS_VERSION in the top-level Makefile.
+
+config BR2_PACKAGE_GLASS_VARIANT
+	string "glass variant"
+	default "wayland"
+	help
+	  The Gio window-system backend variant to use. Must match GLASS_VARIANT
+	  in the top-level Makefile and the suffix of the downloaded release archive.
+	  Choices: wayland (no X11 dep), x11, full (both backends).
 
 endif
-

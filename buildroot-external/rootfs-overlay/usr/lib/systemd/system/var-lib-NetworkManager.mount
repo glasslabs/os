@@ -1,0 +1,18 @@
+[Unit]
+Description=NetworkManager state directory
+Documentation=https://github.com/glasslabs/os
+# Ensure the source directory exists before mounting.
+Requires=glassos-system-dirs.service
+After=glassos-system-dirs.service
+Before=NetworkManager.service
+
+[Mount]
+What=/data/NetworkManager/lib
+Where=/var/lib/NetworkManager
+Type=none
+Options=bind
+LazyUnmount=yes
+
+[Install]
+WantedBy=glassos-bind.target
+

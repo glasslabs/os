@@ -1,0 +1,8 @@
+[Unit]
+Description=GlassOS bind mounts
+Documentation=https://github.com/glasslabs/os
+Before=network.target
+
+[Install]
+WantedBy=multi-user.target
+

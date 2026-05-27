@@ -51,3 +51,5 @@ glassos_pre_build
 # ── Permissions ─────────────────────────────────────────────────────────────
 chmod +x "${TARGET_DIR}/usr/libexec/glassos-expand"
 chmod +x "${TARGET_DIR}/usr/libexec/glassos-wifi-provision"
+chmod +x "${TARGET_DIR}/usr/libexec/glassos-data-dirs"
+chmod +x "${TARGET_DIR}/usr/libexec/glassos-system-dirs"
