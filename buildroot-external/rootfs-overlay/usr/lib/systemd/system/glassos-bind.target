@@ -1,6 +1,6 @@
 [Unit]
 Description=GlassOS bind mounts
-Documentation=https://github.com/glasslabs/os
+Documentation=man:systemd.target(5)
 Before=network.target
 
 [Install]

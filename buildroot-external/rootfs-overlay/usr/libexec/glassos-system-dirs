@@ -2,19 +2,18 @@
 # glassos-system-dirs — create persistent system directories and seed default
 # files on /data before bind-mount units project them onto the read-only rootfs.
 
+mkdir -p /data/etc
+
 # NetworkManager
-mkdir -p /data/NetworkManager/system-connections
-mkdir -p /data/NetworkManager/lib
+mkdir -p /data/etc/NetworkManager/system-connections
+mkdir -p /data/var/lib/NetworkManager
 
-# SSH host keys
-mkdir -p /data/dropbear
-
-# Persistent journal
-mkdir -p /data/journal
-
-# Hostname — copy the rootfs default on first boot so the value can be
-# changed by writing to /data/hostname without touching the read-only rootfs.
-if [ ! -f /data/hostname ]; then
-    cp -fp /etc/hostname /data/hostname
+if [ ! -f /data/etc/hostname ]; then
+    cp -fp /etc/hostname /data/etc/hostname
 fi
 
+# SSH host keys
+mkdir -p /data/etc/dropbear
+
+# Persistent journal
+mkdir -p /data/var/log/journal

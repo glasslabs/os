@@ -1,12 +1,10 @@
 [Unit]
 Description=GlassOS data partition
-Documentation=https://github.com/glasslabs/os
 DefaultDependencies=no
 Before=local-fs.target umount.target
 Conflicts=umount.target
-# Ensure the partition is expanded to fill the SD card before mounting.
 After=systemd-fsck@dev-disk-by\x2dlabel-glassos\x2ddata.service glassos-expand.service
-Wants=systemd-fsck@dev-disk-by\x2dlabel-glassos\x2ddata.service glassos-expand.service
+Wants=systemd-fsck@dev-disk-by\x2dlabel-glassos\x2ddata.service systemd-growfs@data.service
 
 [Mount]
 What=/dev/disk/by-label/glassos-data

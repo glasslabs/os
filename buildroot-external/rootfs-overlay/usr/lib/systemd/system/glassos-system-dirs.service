@@ -1,15 +1,18 @@
 [Unit]
 Description=Create GlassOS system directories
 Documentation=https://github.com/glasslabs/os
-Requires=data.mount
+DefaultDependencies=no
+RefuseManualStart=true
+RefuseManualStop=true
+Before=glassos-bind.target
 After=data.mount
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
 ExecStart=/usr/libexec/glassos-system-dirs
+RemainAfterExit=yes
 
 [Install]
-WantedBy=glassos-bind.target
+WantedBy=local-fs.target
 
 

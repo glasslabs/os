@@ -6,7 +6,7 @@ After=glassos-system-dirs.service
 Before=systemd-journal-flush.service
 
 [Mount]
-What=/data/journal
+What=/data/var/log/journal
 Where=/var/log/journal
 Type=none
 Options=bind

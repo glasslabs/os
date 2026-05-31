@@ -1,13 +1,17 @@
 [Unit]
 Description=GlassOS management agent
 Documentation=https://github.com/glasslabs/os
-After=network.target glassos-data-dirs.service
-Requires=glassos-data-dirs.service
+Wants=network-online.target
+After=network-online.target glassos-data-dirs.service
+Requires=network-online.target glassos-data-dirs.service
+RequiresMountsFor=/data
 
 [Service]
 Environment=XDG_RUNTIME_DIR=/run/user/0
 Environment=XDG_CACHE_HOME=/data/cache
-ExecStart=/usr/bin/glass-agent --addr=:8080 --data-dir=/data
+Environment=LIBSEAT_BACKEND=builtin
+Environment=LC_ALL=C
+ExecStart=/usr/bin/glass-agent --addr=:80 --data-dir=/data
 Restart=always
 RestartSec=5s
 

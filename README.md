@@ -17,9 +17,9 @@ HTTP API for OTA updates, log access, WiFi configuration, and config/asset/modul
 ```
 systemd
   ├── NetworkManager        → WiFi / Ethernet / DHCP
-  ├── glassos-wifi-provision → import credentials from /boot on first boot (runs before NM)
   ├── glassos-data-dirs     → ensure /data/{config,assets,modules} exist
-  └── glass-agent           → supervisor + HTTP :8080
+  └── glass-agent           → supervisor + HTTP :80
+                                ├── NetworkManager (D-Bus) → WiFi provisioning AP + client
                                 └── cage
                                       └── glass run ...
 ```
@@ -30,11 +30,15 @@ All partitions are identified by filesystem label so that device paths never nee
 to be hardcoded in config, cmdline, or RAUC bundles.
 
 ```
-Label               FS      Size     Mount    Purpose
-glassos-boot        FAT32   256 MB   /boot    U-Boot + kernel + RPi firmware
-glassos-system0     ext4    1.5 GB   /        rootfs slot A (active)
-glassos-system1     ext4    1.5 GB   —        rootfs slot B (RAUC target)
-glassos-data        ext4    512 MB   /data    config, assets, modules (never wiped)
+Label                FS        Size (Pi4/Pi5)   Mount    Purpose
+glassos-boot         FAT32     32 MB / 64 MB    /boot    RPi firmware, U-Boot, DTBs
+glassos-kernel0      squashfs  24 MB            —        Kernel slot A
+glassos-system0      erofs     256 MB           /        rootfs slot A (active)
+glassos-kernel1      squashfs  24 MB            —        Kernel slot B (RAUC target)
+glassos-system1      erofs     256 MB           —        rootfs slot B (RAUC target)
+glassos-bootstate    raw       8 MB             —        U-Boot A/B boot state
+glassos-overlay      ext4      96 MB            —        Writable overlay (mutable /etc, /var)
+glassos-data         ext4      1280 MB          /data    config, assets, modules (never wiped)
 ```
 
 See [Documentation/partitions.md](Documentation/partitions.md) for details.
@@ -132,9 +136,6 @@ make build-rpi4 BR2_CCACHE_DIR=/path/to/ccache
 ```sh
 # Flash Pi 4 image to /dev/sdX
 make flash BOARD=rpi4 DEV=/dev/sdX
-
-# Flash and write WiFi credentials in one step
-make flash BOARD=rpi4 DEV=/dev/sdX SSID="MyNetwork" PSK="mypassword"
 ```
 
 ---
@@ -142,83 +143,61 @@ make flash BOARD=rpi4 DEV=/dev/sdX SSID="MyNetwork" PSK="mypassword"
 ## First Boot
 
 1. Insert SD card, connect display and power.
-2. Find the device IP via your router's DHCP table (hostname: `glass`).
-3. SSH in: `ssh root@<ip>` (password: `glass` — change it).
-4. The `glass-agent` management API is available on port 8080.
+2. If no network connection is available, `glass-agent` automatically starts an open
+   WiFi access point named **`GlassOS-Setup`**.
+3. Connect to `GlassOS-Setup` from your phone or laptop, then POST WiFi credentials
+   to the API (see [WiFi Provisioning](#wifi-provisioning) below).
+4. Once the device connects to your network, the AP is automatically removed.
+5. Find the device IP via your router's DHCP table (hostname: `glass`).
+6. SSH in: `ssh root@<ip>` (password: `glass` — change it).
+7. The `glass-agent` management API is available on port 80.
 
 ---
 
 ## WiFi Provisioning
 
-See [Documentation/wifi-provisioning.md](Documentation/wifi-provisioning.md) for full details.
+`glass-agent` handles WiFi provisioning automatically via NetworkManager over D-Bus.
 
-### Before first boot
-
-Mount the FAT32 boot partition (`glassos-boot`) from your computer and place either:
-
-**Option A — NetworkManager keyfile (recommended):**
-```ini
-# provisioned-wifi.nmconnection
-[connection]
-id=provisioned-wifi
-type=wifi
-autoconnect=yes
-
-[wifi]
-mode=infrastructure
-ssid=MyNetwork
-
-[wifi-security]
-key-mgmt=wpa-psk
-psk=mypassword
-
-[ipv4]
-method=auto
-
-[ipv6]
-method=auto
-addr-gen-mode=stable-privacy
-```
-
-**Option B — legacy `wpa_supplicant.conf`:**
-```
-network={
-    ssid="MyNetwork"
-    psk="mypassword"
-}
-```
-
-Both formats are detected and imported on first boot; the file is then removed from
-`/boot`. On subsequent boots `glassos-wifi-provision` runs as a fast no-op (nothing
-to import) and still completes before NetworkManager starts, ensuring the ordering
-is always correct.
-
-### After first boot
+On startup, if NetworkManager reports no active (non-loopback) connections, `glass-agent`
+creates and activates an open WiFi access point named **`GlassOS-Setup`** (IPv4 `shared`
+mode, no password). You can then connect to that AP and POST credentials to the API:
 
 ```sh
-nmcli device wifi connect "MyNetwork" password "mypassword"
+curl -X POST http://192.168.4.1/network/wifi \
+  -H 'Content-Type: application/json' \
+  -d '{"ssid":"MyNetwork","password":"mypassword"}'
 ```
+
+The agent attempts to connect to the supplied network. If the connection is established
+within 30 seconds the AP is deactivated and removed, and any previous WiFi profile for
+the same device is cleaned up. If the connection fails or times out, the new profile is
+removed and an error is returned so you can try again.
+
+See [Documentation/wifi-provisioning.md](Documentation/wifi-provisioning.md) for full details.
 
 ---
 
 ## HTTP Management API
 
-All endpoints are served on `:8080`.
+All endpoints are served on `:80`.
 
-| Method   | Path                  | Description |
-|----------|-----------------------|-------------|
-| `GET`    | `/status`             | JSON: PID, uptime, restart count |
-| `GET`    | `/logs`               | Last 2000 lines of glass output. `?follow=true` streams live. |
-| `POST`   | `/ota`                | JSON `{"url":"...","sha256":"<hex>"}`. Replaces `/usr/bin/glass` and restarts. |
-| `POST`   | `/config`             | Upload `config.yaml` → restarts glass. |
-| `POST`   | `/secrets`            | Upload `secrets.yaml` → restarts glass. |
-| `POST`   | `/assets/{name}`      | Upload a file to `/data/assets/`. |
-| `DELETE` | `/assets/{name}`      | Delete a file from `/data/assets/`. |
-| `POST`   | `/modules/{name}`     | Upload a `.wasm` module to `/data/modules/`. |
-| `DELETE` | `/modules/{name}`     | Delete a module from `/data/modules/`. |
-| `POST`   | `/os-update`          | JSON `{"url":"..."}`. Downloads and installs a RAUC bundle. Reboot to apply. |
-| `GET`    | `/os-status`          | RAUC slot status: active slot, versions, boot state. |
-| `POST`   | `/reboot`             | Gracefully triggers a system reboot. |
+| Method   | Path                    | Description |
+|----------|-------------------------|-------------|
+| `GET`    | `/glass/status`         | JSON: PID, uptime, restart count. |
+| `GET`    | `/glass/logs`           | Last 2000 lines of glass output. `?follow=true` streams live. |
+| `POST`   | `/glass/restart`        | Restarts the Glass process. |
+| `POST`   | `/glass/update`         | JSON `{"url":"...","sha256":"<hex>"}`. Replaces `/usr/bin/glass` and restarts. |
+| `GET`    | `/glass/config`         | Returns the current `config.yaml`. 404 if not yet written. |
+| `POST`   | `/glass/config`         | Upload `config.yaml`. Restart Glass to apply. |
+| `POST`   | `/glass/secrets`        | Upload `secrets.yaml`. Restart Glass to apply. |
+| `GET`    | `/glass/assets`         | JSON array of asset filenames in `/data/assets/`. |
+| `GET`    | `/glass/assets/{name}`  | Download a file from `/data/assets/`. |
+| `POST`   | `/glass/assets/{name}`  | Upload a file to `/data/assets/`. |
+| `DELETE` | `/glass/assets/{name}`  | Delete a file from `/data/assets/`. |
+| `POST`   | `/network/wifi`         | JSON `{"ssid":"...","password":"..."}`. Connects to a WiFi network; removes the provisioning AP on success. |
+| `POST`   | `/os/update`            | JSON `{"url":"..."}`. Downloads and installs a RAUC bundle. Reboot to apply. |
+| `GET`    | `/os/status`            | RAUC slot status: active slot, versions, boot state. |
+| `POST`   | `/os/reboot`            | Gracefully triggers a system reboot. |
 
 ---
 
@@ -226,41 +205,63 @@ All endpoints are served on `:8080`.
 
 ### Check status
 ```sh
-curl http://glass.local:8080/status
+curl http://glass.local/glass/status
 ```
 
 ### View logs
 ```sh
-curl http://glass.local:8080/logs
-curl http://glass.local:8080/logs?follow=true   # stream live
+curl http://glass.local/glass/logs
+curl http://glass.local/glass/logs?follow=true   # stream live
 ```
 
-### OTA update (glass binary)
+### Restart Glass
 ```sh
-curl -X POST http://glass.local:8080/ota \
+curl -X POST http://glass.local/glass/restart
+```
+
+### Provision WiFi
+```sh
+# While connected to the GlassOS-Setup AP (device IP is 192.168.4.1)
+curl -X POST http://192.168.4.1/network/wifi \
+  -H 'Content-Type: application/json' \
+  -d '{"ssid":"MyNetwork","password":"mypassword"}'
+```
+
+### Update Glass binary (OTA)
+```sh
+curl -X POST http://glass.local/glass/update \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/glasslabs/looking-glass/releases/download/v1.2.3/glass-v1.2.3-linux-arm64-wayland.zip","sha256":"<hex>"}'
 ```
 
 ### Upload config
 ```sh
-curl -X POST http://glass.local:8080/config --data-binary @config.yaml
+curl -X POST http://glass.local/glass/config --data-binary @config.yaml
 ```
 
-### Upload an asset or module
+### View current config
 ```sh
-curl -X POST http://glass.local:8080/assets/background.jpg --data-binary @background.jpg
-curl -X POST http://glass.local:8080/modules/clock.wasm   --data-binary @clock.wasm
+curl http://glass.local/glass/config
+```
+
+### Upload an asset
+```sh
+curl -X POST http://glass.local/glass/assets/background.jpg --data-binary @background.jpg
+```
+
+### List assets
+```sh
+curl http://glass.local/glass/assets
 ```
 
 ### OS update (RAUC)
 ```sh
-curl -X POST http://glass.local:8080/os-update \
+curl -X POST http://glass.local/os/update \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/glasslabs/os/releases/download/v1.2.3/glassos-v1.2.3-rpi4.raucb"}'
 
 # Then reboot to apply
-curl -X POST http://glass.local:8080/reboot
+curl -X POST http://glass.local/os/reboot
 ```
 
 ---

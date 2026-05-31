@@ -9,10 +9,10 @@
 # Wireless — replaced by glassos-wifi-provision that writes NM keyfiles
 disable wpa_supplicant.service
 
-# systemd's 90-systemd.preset enables these; disable on this embedded image
-# because we use NetworkManager for all network management and do not need
-# the standalone networkd/resolved stack.
+# Disable the standalone networkd stack — NM owns all network management.
+# The socket is disabled explicitly to prevent socket-activation of networkd.
 disable systemd-networkd.service
+disable systemd-networkd.socket
 disable systemd-networkd-wait-online.service
 disable systemd-network-generator.service
 disable systemd-resolved.service

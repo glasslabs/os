@@ -1,67 +1,44 @@
 # WiFi Provisioning
 
-GlassOS supports two methods for configuring WiFi before or after first boot.
+GlassOS uses `glass-agent` to provision WiFi via NetworkManager over D-Bus.
+No credentials file on the SD card is required.
 
-## Before first boot (SD card provisioning)
+## How it works
 
-Copy a credentials file to the FAT32 boot partition (`glassos-boot`, partition 1)
-before inserting the SD card for the first time.  On first boot the
-`glassos-wifi-provision` service runs, imports the file, removes it from
-`/boot`, and hands the connection off to NetworkManager.
+On startup, `glass-agent` queries NetworkManager for active connections. If no
+active (non-loopback) connection exists, it creates and activates an open
+802.11 access point:
 
-### Option A — NetworkManager keyfile (recommended)
+| Property  | Value           |
+|-----------|-----------------|
+| SSID      | `GlassOS-Setup` |
+| Security  | Open (none)     |
+| IPv4      | Shared (NAT)    |
 
-Create a file named `<anything>.nmconnection` on the boot partition:
+The device is then reachable at `192.168.4.1` on port `80`.
 
-```ini
-[connection]
-id=my-wifi
-type=wifi
-autoconnect=yes
+## Provisioning steps
 
-[wifi]
-mode=infrastructure
-ssid=MyNetworkSSID
-
-[wifi-security]
-key-mgmt=wpa-psk
-psk=mysecretpassword
-
-[ipv4]
-method=auto
-
-[ipv6]
-method=auto
-addr-gen-mode=stable-privacy
-```
-
-### Option B — wpa_supplicant.conf (legacy / convenience)
-
-A minimal `wpa_supplicant.conf` on the boot partition is also accepted.  The
-provisioning script extracts the SSID and PSK and converts the file to an NM
-keyfile automatically:
-
-```
-network={
-    ssid="MyNetworkSSID"
-    psk="mysecretpassword"
-}
-```
-
-## Using `make flash`
-
-The `make flash` target accepts `SSID=` and `PSK=` and writes an NM keyfile
-to the boot partition automatically:
+1. Power on the device. If no network is configured the `GlassOS-Setup`
+   access point appears within a few seconds.
+2. Connect your phone or laptop to `GlassOS-Setup`.
+3. POST your WiFi credentials to the agent API:
 
 ```sh
-make flash BOARD=rpi4 DEV=/dev/sdX SSID="MyNetwork" PSK="mypassword"
+curl -X POST http://192.168.4.1:80/network/wifi \
+  -H 'Content-Type: application/json' \
+  -d '{"ssid":"MyNetworkSSID","password":"mysecretpassword"}'
 ```
 
-## After first boot
+4. The agent adds a WPA2 infrastructure connection and waits up to **30 seconds**
+   for it to reach the `Activated` state.
+   - **Success** — the AP is deactivated and deleted; any previous WiFi profile
+     for the same device is removed. The device is now on your network.
+   - **Failure / timeout** — the new connection profile is cleaned up and an
+     error is returned. Correct the credentials and try again.
 
-Connect using `nmcli` over SSH (Dropbear runs on port 22):
+## Subsequent reboots
 
-```sh
-nmcli device wifi connect "MyNetworkSSID" password "mysecretpassword"
-```
-
+Once a WiFi connection profile exists, NetworkManager reconnects automatically
+on every boot. `glass-agent` detects the active connection at startup and
+skips the AP entirely.

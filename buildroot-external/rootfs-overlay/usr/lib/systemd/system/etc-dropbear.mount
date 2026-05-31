@@ -6,7 +6,7 @@ After=glassos-system-dirs.service
 Before=dropbear.service
 
 [Mount]
-What=/data/dropbear
+What=/data/etc/dropbear
 Where=/etc/dropbear
 Type=none
 Options=bind

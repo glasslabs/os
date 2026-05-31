@@ -6,11 +6,10 @@ After=glassos-system-dirs.service
 Before=NetworkManager.service
 
 [Mount]
-What=/data/NetworkManager/system-connections
+What=/data/etc/NetworkManager/system-connections
 Where=/etc/NetworkManager/system-connections
 Type=none
 Options=bind
-LazyUnmount=yes
 
 [Install]
 WantedBy=glassos-bind.target

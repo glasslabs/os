@@ -6,7 +6,7 @@ After=glassos-system-dirs.service
 Before=network.target
 
 [Mount]
-What=/data/hostname
+What=/data/etc/hostname
 Where=/etc/hostname
 Type=none
 Options=bind

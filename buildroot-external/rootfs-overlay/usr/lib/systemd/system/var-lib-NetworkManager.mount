@@ -7,7 +7,7 @@ After=glassos-system-dirs.service
 Before=NetworkManager.service
 
 [Mount]
-What=/data/NetworkManager/lib
+What=/data/var/lib/NetworkManager
 Where=/var/lib/NetworkManager
 Type=none
 Options=bind
