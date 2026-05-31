@@ -42,9 +42,21 @@ func (m *mockSupervisor) Follow(_ context.Context) <-chan string {
 	return ch
 }
 
+type mockNetworkManager struct{ mock.Mock }
+
+func (m *mockNetworkManager) SetWiFi(_ context.Context, ssid, password string) error {
+	return m.Called(ssid, password).Error(0)
+}
+
 func newServer(t *testing.T, sup api.Supervisor, glassBin, dataDir string) *api.Server {
 	t.Helper()
 
+	return newServerWithNetwork(t, sup, &mockNetworkManager{}, glassBin, dataDir)
+}
+
+func newServerWithNetwork(t *testing.T, sup api.Supervisor, nm api.NetworkManager, glassBin, dataDir string) *api.Server {
+	t.Helper()
+
 	log := logger.New(io.Discard, logger.LogfmtFormat(), logger.Info)
-	return api.NewServer("", sup, glassBin, dataDir, log)
+	return api.NewServer("", sup, nm, glassBin, dataDir, log)
 }

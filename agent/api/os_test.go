@@ -38,7 +38,7 @@ func TestServer_HandleOSUpdate(t *testing.T) {
 			sup := new(mockSupervisor)
 			srv := newServer(t, sup, "", t.TempDir())
 
-			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/os-update", strings.NewReader(test.body))
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/os/update", strings.NewReader(test.body))
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 
@@ -55,7 +55,7 @@ func TestServer_HandleOSStatus(t *testing.T) {
 	sup := new(mockSupervisor)
 	srv := newServer(t, sup, "", t.TempDir())
 
-	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/os-status", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/os/status", nil)
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, r)
 
@@ -65,13 +65,13 @@ func TestServer_HandleOSStatus(t *testing.T) {
 	sup.AssertExpectations(t)
 }
 
-func TestServer_HandleReboot(t *testing.T) {
+func TestServer_HandleOSReboot(t *testing.T) {
 	t.Parallel()
 
 	sup := new(mockSupervisor)
 	srv := newServer(t, sup, "", t.TempDir())
 
-	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/reboot", nil)
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/os/reboot", nil)
 	w := httptest.NewRecorder()
 
 	done := make(chan struct{})

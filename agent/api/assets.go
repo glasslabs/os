@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -8,14 +9,29 @@ import (
 	"path/filepath"
 )
 
+func (s *Server) handleGetConfig() http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		data, err := os.ReadFile(filepath.Join(s.dataDir, "config", "config.yaml"))
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				http.Error(rw, "config not found", http.StatusNotFound)
+				return
+			}
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = rw.Write(data)
+	}
+}
+
 func (s *Server) handleConfig() http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		if err := writeRequest(req, filepath.Join(s.dataDir, "config", "config.yaml")); err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		s.supervisor.Restart()
 
 		rw.WriteHeader(http.StatusNoContent)
 	}
@@ -28,9 +44,58 @@ func (s *Server) handleSecrets() http.HandlerFunc {
 			return
 		}
 
-		s.supervisor.Restart()
-
 		rw.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (s *Server) handleListAssets() http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		dir := filepath.Join(s.dataDir, "assets")
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			entries = nil
+		}
+
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			if !e.IsDir() {
+				names = append(names, e.Name())
+			}
+		}
+
+		rw.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(rw).Encode(names)
+	}
+}
+
+func (s *Server) handleGetAsset() http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		name := req.PathValue("name")
+		dest := filepath.Join(s.dataDir, "assets", filepath.Base(name))
+
+		f, err := os.Open(dest)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				http.Error(rw, "asset not found", http.StatusNotFound)
+				return
+			}
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer func() { _ = f.Close() }()
+
+		info, err := f.Stat()
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.ServeContent(rw, req, name, info.ModTime(), f)
 	}
 }
 

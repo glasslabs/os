@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func (s *Server) handleOTA() http.HandlerFunc {
+func (s *Server) handleUpdate() http.HandlerFunc {
 	type otaRequest struct {
 		URL    string `json:"url"`
 		SHA256 string `json:"sha256"`

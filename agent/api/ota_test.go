@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestServer_HandleOTA(t *testing.T) {
+func TestServer_HandleUpdate(t *testing.T) {
 	t.Parallel()
 
 	binaryContent := []byte("fake glass binary")
@@ -74,7 +74,7 @@ func TestServer_HandleOTA(t *testing.T) {
 
 			srv := newServer(t, sup, glassBin, t.TempDir())
 
-			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/ota", strings.NewReader(test.body))
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/glass/update", strings.NewReader(test.body))
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 

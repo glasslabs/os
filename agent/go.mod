@@ -3,6 +3,8 @@ module github.com/glasslabs/os/agent
 go 1.26.3
 
 require (
+	github.com/Wifx/gonetworkmanager/v2 v2.2.0
+	github.com/godbus/dbus/v5 v5.1.0
 	github.com/hamba/logger/v2 v2.10.0
 	github.com/stretchr/testify v1.11.1
 )

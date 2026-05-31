@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+func (s *Server) handleRestart() http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		s.supervisor.Restart()
+		rw.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func (s *Server) handleStatus() http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		info := s.supervisor.Info()

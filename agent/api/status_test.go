@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestServer_HandleRestart(t *testing.T) {
+	t.Parallel()
+
+	sup := new(mockSupervisor)
+	sup.On("Restart").Return()
+
+	srv := newServer(t, sup, "", t.TempDir())
+
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/glass/restart", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	sup.AssertExpectations(t)
+}
+
 func TestServer_HandleStatus(t *testing.T) {
 	t.Parallel()
 
@@ -49,7 +65,7 @@ func TestServer_HandleStatus(t *testing.T) {
 
 			srv := newServer(t, sup, "", t.TempDir())
 
-			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/status", nil)
+			r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/glass/status", nil)
 			w := httptest.NewRecorder()
 			srv.ServeHTTP(w, r)
 

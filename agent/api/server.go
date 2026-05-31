@@ -19,10 +19,16 @@ type Supervisor interface {
 	Follow(ctx context.Context) <-chan string
 }
 
+// NetworkManager is the interface the Server uses to configure WiFi.
+type NetworkManager interface {
+	SetWiFi(ctx context.Context, ssid, password string) error
+}
+
 // Server serves the glass-agent HTTP management API.
 type Server struct {
 	addr       string
 	supervisor Supervisor
+	network    NetworkManager
 	glassBin   string
 	dataDir    string
 	h          http.Handler
@@ -30,10 +36,11 @@ type Server struct {
 }
 
 // NewServer returns a new Server.
-func NewServer(addr string, supervisor Supervisor, glassBin, dataDir string, log *logger.Logger) *Server {
+func NewServer(addr string, supervisor Supervisor, network NetworkManager, glassBin, dataDir string, log *logger.Logger) *Server {
 	s := &Server{
 		addr:       addr,
 		supervisor: supervisor,
+		network:    network,
 		glassBin:   glassBin,
 		dataDir:    dataDir,
 		log:        log,
@@ -47,16 +54,21 @@ func NewServer(addr string, supervisor Supervisor, glassBin, dataDir string, log
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /status", s.handleStatus())
-	mux.HandleFunc("GET /logs", s.handleLogs())
-	mux.HandleFunc("POST /ota", s.handleOTA())
-	mux.HandleFunc("POST /config", s.handleConfig())
-	mux.HandleFunc("POST /secrets", s.handleSecrets())
-	mux.HandleFunc("POST /assets/{name}", s.handleUploadAsset())
-	mux.HandleFunc("DELETE /assets/{name}", s.handleDeleteAsset())
-	mux.HandleFunc("POST /os-update", s.handleOSUpdate())
-	mux.HandleFunc("GET /os-status", s.handleOSStatus())
-	mux.HandleFunc("POST /reboot", s.handleReboot())
+	mux.HandleFunc("GET /glass/status", s.handleStatus())
+	mux.HandleFunc("GET /glass/logs", s.handleLogs())
+	mux.HandleFunc("POST /glass/restart", s.handleRestart())
+	mux.HandleFunc("POST /glass/update", s.handleUpdate())
+	mux.HandleFunc("GET /glass/config", s.handleGetConfig())
+	mux.HandleFunc("POST /glass/config", s.handleConfig())
+	mux.HandleFunc("POST /glass/secrets", s.handleSecrets())
+	mux.HandleFunc("GET /glass/assets", s.handleListAssets())
+	mux.HandleFunc("GET /glass/assets/{name}", s.handleGetAsset())
+	mux.HandleFunc("POST /glass/assets/{name}", s.handleUploadAsset())
+	mux.HandleFunc("DELETE /glass/assets/{name}", s.handleDeleteAsset())
+	mux.HandleFunc("POST /network/wifi", s.handleSetWifi())
+	mux.HandleFunc("POST /os/update", s.handleOSUpdate())
+	mux.HandleFunc("GET /os/status", s.handleOSStatus())
+	mux.HandleFunc("POST /os/reboot", s.handleOSReboot())
 
 	return mux
 }

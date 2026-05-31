@@ -22,18 +22,18 @@ func TestServer_HandleLogs(t *testing.T) {
 	}{
 		{
 			name:      "buffered lines",
-			url:       "/logs",
+			url:       "/glass/logs",
 			lines:     []string{"line one", "line two"},
 			wantLines: []string{"line one", "line two"},
 		},
 		{
 			name:      "no lines",
-			url:       "/logs",
+			url:       "/glass/logs",
 			wantLines: nil,
 		},
 		{
 			name:      "follow streams additional lines",
-			url:       "/logs?follow=true",
+			url:       "/glass/logs?follow=true",
 			lines:     []string{"buffered"},
 			followCh:  make(chan string, 2),
 			wantLines: []string{"buffered", "streamed one", "streamed two"},

@@ -71,7 +71,7 @@ func (s *Server) handleOSStatus() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleReboot() http.HandlerFunc {
+func (s *Server) handleOSReboot() http.HandlerFunc {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusNoContent)
 		if f, ok := rw.(http.Flusher); ok {
