@@ -1,17 +1,15 @@
 [Unit]
-Description=Dropbear persistent host keys
+Description=Root Cache Mount
 Documentation=https://github.com/glasslabs/os
 Requires=glassos-system-dirs.service
 After=glassos-system-dirs.service
-Before=dropbear.service
+Before=glass-agent.service
 
 [Mount]
-What=/data/etc/dropbear
-Where=/etc/dropbear
+What=/data/root/.cache
+Where=/root/.cache
 Type=none
 Options=bind
 
 [Install]
 WantedBy=glassos-bind.target
-
-

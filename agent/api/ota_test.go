@@ -17,15 +17,24 @@ import (
 func TestServer_HandleUpdate(t *testing.T) {
 	t.Parallel()
 
-	binaryContent := []byte("fake glass binary")
+	binaryContent := readFile(t, "testdata/binary.txt")
 	sum := sha256.Sum256(binaryContent)
-	validSHA256 := hex.EncodeToString(sum[:])
+	binarySHA256 := hex.EncodeToString(sum[:])
+
+	zipContent := readFile(t, "testdata/binary.txt.zip")
+	sum = sha256.Sum256(zipContent)
+	zipSHA256 := hex.EncodeToString(sum[:])
 
 	// Serve a fake binary for download.
 	downloadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(binaryContent)
 	}))
 	t.Cleanup(downloadSrv.Close)
+
+	downloadZipSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(zipContent)
+	}))
+	t.Cleanup(downloadZipSrv.Close)
 
 	tests := []struct {
 		name       string
@@ -35,7 +44,13 @@ func TestServer_HandleUpdate(t *testing.T) {
 	}{
 		{
 			name:       "downloads and replaces binary",
-			body:       `{"url":"` + downloadSrv.URL + `","sha256":"` + validSHA256 + `"}`,
+			body:       `{"url":"` + downloadSrv.URL + `","sha256":"` + binarySHA256 + `"}`,
+			wantStatus: http.StatusNoContent,
+			wantBin:    true,
+		},
+		{
+			name:       "downloads and replaces zipped binary",
+			body:       `{"url":"` + downloadZipSrv.URL + `","sha256":"` + zipSHA256 + `"}`,
 			wantStatus: http.StatusNoContent,
 			wantBin:    true,
 		},
@@ -91,3 +106,11 @@ func TestServer_HandleUpdate(t *testing.T) {
 	}
 }
 
+func readFile(t *testing.T, filename string) []byte {
+	t.Helper()
+
+	b, err := os.ReadFile(filename)
+	require.NoError(t, err)
+
+	return b
+}

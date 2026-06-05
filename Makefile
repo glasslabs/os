@@ -5,7 +5,7 @@ AGENT_DIST   := $(CURDIR)/agent/dist
 GLASS_DIST   := $(CURDIR)/glass/dist
 
 # Glass version — keep in sync with BR2_PACKAGE_GLASS_VERSION in the defconfigs.
-GLASS_VERSION ?= v2.0.2
+GLASS_VERSION ?= v2.0.3
 # Glass variant — the Gio window-system backend compiled into the binary.
 # Choices: wayland (default, no X11 dep), x11, framebuffer, full.
 # Must match the variant suffix used in the looking-glass GitHub release archive.

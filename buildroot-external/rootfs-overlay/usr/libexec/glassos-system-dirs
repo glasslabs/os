@@ -15,5 +15,15 @@ fi
 # SSH host keys
 mkdir -p /data/etc/dropbear
 
+# Root cache
+mkdir -p /data/root/.cache
+
 # Persistent journal
 mkdir -p /data/var/log/journal
+
+# Glass binary — seed a writable copy for OTA updates on first boot.
+# Also overwrite if the rootfs binary is newer (i.e. after a RAUC OS update).
+mkdir -p /data/usr/lib/glass
+if [ ! -f /data/usr/lib/glass/glass ] || [ /usr/lib/glass/glass -nt /data/usr/lib/glass/glass ]; then
+    cp -fp /usr/lib/glass/glass /data/usr/lib/glass/glass
+fi

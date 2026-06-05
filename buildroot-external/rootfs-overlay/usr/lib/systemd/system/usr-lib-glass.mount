@@ -1,17 +1,16 @@
 [Unit]
-Description=Dropbear persistent host keys
+Description=Glass binary directory
 Documentation=https://github.com/glasslabs/os
+# Ensure the source directory exists before mounting.
 Requires=glassos-system-dirs.service
 After=glassos-system-dirs.service
-Before=dropbear.service
+Before=glass-agent.service
 
 [Mount]
-What=/data/etc/dropbear
-Where=/etc/dropbear
+What=/data/usr/lib/glass
+Where=/usr/lib/glass
 Type=none
 Options=bind
 
 [Install]
 WantedBy=glassos-bind.target
-
-

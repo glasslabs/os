@@ -10,7 +10,6 @@ What=/data/etc/hostname
 Where=/etc/hostname
 Type=none
 Options=bind
-LazyUnmount=yes
 
 [Install]
 WantedBy=glassos-bind.target

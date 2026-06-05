@@ -25,7 +25,7 @@ var version = "dev"
 
 func main() {
 	addr := flag.String("addr", ":80", "HTTP server listen address")
-	glassBin := flag.String("glass-bin", "/usr/bin/glass", "Path to the glass binary")
+	glassBin := flag.String("glass-bin", "/usr/lib/glass/glass", "Path to the glass binary")
 	dataDir := flag.String("data-dir", "/data", "Path to the data directory")
 	logLevel := flag.String("log.level", "info", "Log level (trace, debug, info, warn, error)")
 	flag.Parse()
@@ -43,15 +43,14 @@ func main() {
 	defer cancel()
 
 	exe := &exec.Executable{
-		// Path: "/usr/bin/cage",
-		Path: *glassBin,
-		Args: []string{ // "--",
-			// *glassBin, "run",
-			"run",
+		Path: "/usr/bin/cage",
+		Args: []string{"--",
+			*glassBin, "run",
 			"--config", filepath.Join(*dataDir, "config", "config.yaml"),
 			"--secrets", filepath.Join(*dataDir, "config", "secrets.yaml"),
 			"--assets", filepath.Join(*dataDir, "assets"),
 			"--modules", filepath.Join(*dataDir, "modules")},
+		Envs:        os.Environ(),
 		SysProcAttr: &syscall.SysProcAttr{Setpgid: true},
 	}
 	super := proc.New(exe, log)

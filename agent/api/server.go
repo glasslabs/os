@@ -2,10 +2,13 @@
 package api
 
 import (
+	"archive/zip"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/glasslabs/os/agent/proc"
 	"github.com/hamba/logger/v2"
@@ -94,6 +97,77 @@ func download(ctx context.Context, w io.Writer, h io.Writer, url string) error {
 		return fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	_, err = io.Copy(io.MultiWriter(w, h), resp.Body)
+	body := io.TeeReader(resp.Body, h)
+	rc, err := decompress(body, resp.Header.Get("Content-Type"))
+	if err != nil {
+		return fmt.Errorf("decompressing response: %w", err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	_, err = io.Copy(w, rc)
+	return err
+}
+
+func decompress(r io.Reader, contentType string) (io.ReadCloser, error) {
+	switch contentType {
+	case "application/gzip":
+		gr, err := gzip.NewReader(r)
+		if err != nil {
+			return nil, fmt.Errorf("creating gzip reader: %w", err)
+		}
+		return gr, nil
+	case "application/zip":
+		f, err := os.CreateTemp("", "*.zip")
+		if err != nil {
+			return nil, fmt.Errorf("creating temporary file: %w", err)
+		}
+		closeFile := func() {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+		}
+
+		if _, err = io.Copy(f, r); err != nil {
+			closeFile()
+			return nil, fmt.Errorf("unzipping file: %w", err)
+		}
+		if _, err = f.Seek(0, io.SeekStart); err != nil {
+			closeFile()
+			return nil, fmt.Errorf("seeking file: %w", err)
+		}
+		stat, err := f.Stat()
+		if err != nil {
+			closeFile()
+			return nil, fmt.Errorf("stating file: %w", err)
+		}
+
+		zr, err := zip.NewReader(f, stat.Size())
+		if err != nil {
+			return nil, fmt.Errorf("creating zip reader: %w", err)
+		}
+		if len(zr.File) == 0 {
+			return nil, fmt.Errorf("zip archive is empty")
+		}
+		zf, err := zr.File[0].Open()
+		if err != nil {
+			return nil, fmt.Errorf("opening zip entry: %w", err)
+		}
+		return closeFuncReader{
+			ReadCloser: zf,
+			closeFn:    closeFile,
+		}, nil
+	default:
+		return io.NopCloser(r), nil
+	}
+}
+
+type closeFuncReader struct {
+	io.ReadCloser
+
+	closeFn func()
+}
+
+func (f closeFuncReader) Close() error {
+	err := f.ReadCloser.Close()
+	f.closeFn()
 	return err
 }

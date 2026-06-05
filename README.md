@@ -186,7 +186,7 @@ All endpoints are served on `:80`.
 | `GET`    | `/glass/status`         | JSON: PID, uptime, restart count. |
 | `GET`    | `/glass/logs`           | Last 2000 lines of glass output. `?follow=true` streams live. |
 | `POST`   | `/glass/restart`        | Restarts the Glass process. |
-| `POST`   | `/glass/update`         | JSON `{"url":"...","sha256":"<hex>"}`. Replaces `/usr/bin/glass` and restarts. |
+| `POST`   | `/glass/update`         | JSON `{"url":"...","sha256":"<hex>"}`. Replaces `/usr/lib/glass/glass` and restarts. |
 | `GET`    | `/glass/config`         | Returns the current `config.yaml`. 404 if not yet written. |
 | `POST`   | `/glass/config`         | Upload `config.yaml`. Restart Glass to apply. |
 | `POST`   | `/glass/secrets`        | Upload `secrets.yaml`. Restart Glass to apply. |
