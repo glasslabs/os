@@ -1,0 +1,18 @@
+[Unit]
+Description=GlassOS Supervisor
+Documentation=https://github.com/glasslabs/os
+Wants=network-online.target
+After=network-online.target glassos-data-dirs.service usr-lib-glass.mount
+Requires=network-online.target glassos-data-dirs.service usr-lib-glass.mount
+RequiresMountsFor=/data /usr/lib/glass
+
+[Service]
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=LIBSEAT_BACKEND=noop
+Environment=XCOMPOSEFILE=/usr/share/X11/locale/en_US.UTF-8/Compose
+ExecStart=/usr/bin/supervisor --addr=:80 --glass-bin=/usr/lib/glass/glass --data-dir=/data
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

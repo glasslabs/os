@@ -1,0 +1,122 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      board:
+        description: Board to build (leave blank for all)
+        type: choice
+        options: ['', rpi4, rpi5]
+        required: false
+      glass_version:
+        description: "Glass binary version to embed (e.g. v2.0.0; leave blank to use Makefile default)"
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Set build matrix
+        id: matrix
+        run: |
+          if [ -n "${{ inputs.board }}" ]; then
+            echo 'matrix=["${{ inputs.board }}"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix=["rpi4","rpi5"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        board: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Get version
+        id: version
+        run: |
+          . ${GITHUB_WORKSPACE}/buildroot-external/meta
+          echo "version_main=${VERSION_MAJOR}.${VERSION_MINOR}" >> $GITHUB_OUTPUT
+          if [ -z "${GLASSOS_VERSION_PATCH}" ]; then
+            version_full="${VERSION_MAJOR}.${VERSION_MINOR}"
+          else
+            version_full="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+          fi
+          echo "version_full=${version_full}" >> $GITHUB_OUTPUT
+          echo "Full version number of this release is \"${version_full}\"."
+
+      - name: Install Buildroot host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            automake bash bc binutils bison build-essential bzip2 ccache cpio file \
+            flex genext2fs genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget xz-utils
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildroot-ccache
+          key: buildroot-ccache-${{ matrix.board }}-${{ github.run_id }}
+          restore-keys: buildroot-ccache-${{ matrix.board }}-
+
+      - name: Write RAUC signing key
+        env:
+          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
+        run: |
+          if [ -n "${RAUC_SIGNING_KEY}" ]; then
+            echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-signing.key.pem
+            echo "GLASSOS_RAUC_KEY=/tmp/rauc-signing.key.pem" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build image
+        run: |
+          make build-${{ matrix.board }} \
+            BR2_CCACHE_DIR="$HOME/.buildroot-ccache" \
+            ${GLASS_VERSION:+GLASS_VERSION="$GLASS_VERSION"}
+        env:
+          GLASS_VERSION: ${{ inputs.glass_version }}
+          CCACHE_MAXSIZE: 1500M
+
+      - name: Clean up signing key
+        if: always()
+        run: rm -f /tmp/rauc-signing.key.pem
+
+      - name: Upload OS Image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
+          path: |
+            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
+          retention-days: 14
+
+      - name: Upload RAUC bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
+          path: |
+            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
+          retention-days: 14
+
+      - name: Print cache stats
+        run: |
+          echo "Cache size: $(du -sh $HOME/.buildroot-ccache)"
+          echo "Files total: $(find $HOME/.buildroot-ccache -mindepth 1 -type f | wc -l)"
+          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile | wc -l)"
+          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile -delete
+          echo "Cache size after pruning: $(du -sh $HOME/.buildroot-ccache)"

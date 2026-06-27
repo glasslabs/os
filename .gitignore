@@ -1,0 +1,6 @@
+buildroot/output/
+buildroot/dl/
+
+# RAUC signing key — never commit the private key
+buildroot-external/ota/dev-ca.key.pem
+buildroot-external/ota/*.key.pem

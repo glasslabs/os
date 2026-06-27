@@ -1,0 +1,18 @@
+[Unit]
+Description=GlassOS overlay partition
+Documentation=https://github.com/glasslabs/os
+DefaultDependencies=no
+Before=local-fs.target umount.target
+Conflicts=umount.target
+After=systemd-fsck@dev-disk-by\x2dlabel-glassos\x2doverlay.service
+Wants=systemd-fsck@dev-disk-by\x2dlabel-glassos\x2doverlay.service
+
+[Mount]
+What=/dev/disk/by-label/glassos-overlay
+Where=/overlay
+Type=ext4
+Options=defaults
+
+[Install]
+WantedBy=local-fs.target
+

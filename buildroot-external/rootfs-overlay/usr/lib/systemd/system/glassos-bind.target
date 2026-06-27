@@ -1,0 +1,8 @@
+[Unit]
+Description=GlassOS bind mounts
+Documentation=man:systemd.target(5)
+Before=network.target
+
+[Install]
+WantedBy=multi-user.target
+

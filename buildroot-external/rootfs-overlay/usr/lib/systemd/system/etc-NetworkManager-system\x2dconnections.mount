@@ -1,0 +1,15 @@
+[Unit]
+Description=NetworkManager persistent connection profiles
+Documentation=https://github.com/glasslabs/os
+Requires=glassos-system-dirs.service
+After=glassos-system-dirs.service
+Before=NetworkManager.service
+
+[Mount]
+What=/data/etc/NetworkManager/system-connections
+Where=/etc/NetworkManager/system-connections
+Type=none
+Options=bind
+
+[Install]
+WantedBy=glassos-bind.target

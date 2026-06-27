@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        board: [rpi4, rpi5]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Buildroot host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            automake bash bc binutils bison build-essential bzip2 ccache cpio file \
+            flex genext2fs genimage gettext git help2man libncurses-dev libssl-dev \
+            make patch perl python3 python3-setuptools rsync texinfo unzip wget xz-utils
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildroot-ccache
+          key: buildroot-ccache-${{ matrix.board }}-${{ github.run_id }}
+          restore-keys: buildroot-ccache-${{ matrix.board }}-
+
+      - name: Write RAUC signing key
+        env:
+          RAUC_SIGNING_KEY: ${{ secrets.RAUC_SIGNING_KEY }}
+        run: |
+          if [ -n "${RAUC_SIGNING_KEY}" ]; then
+            echo "${RAUC_SIGNING_KEY}" > /tmp/rauc-signing.key.pem
+            echo "GLASSOS_RAUC_KEY=/tmp/rauc-signing.key.pem" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build image and RAUC bundle
+        run: |
+          make build-${{ matrix.board }} \
+            BR2_CCACHE_DIR="$HOME/.buildroot-ccache" \
+            GLASSOS_VERSION=${{ github.ref_name }}
+        env:
+          CCACHE_MAXSIZE: 1500M
+
+      - name: Clean up signing key
+        if: always()
+        run: rm -f /tmp/rauc-signing.key.pem
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
+            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          retention-days: 14
+
+      - name: Print cache stats
+        run: |
+          echo "Cache size: $(du -sh $HOME/.buildroot-ccache)"
+          echo "Files total: $(find $HOME/.buildroot-ccache -mindepth 1 -type f | wc -l)"
+          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile | wc -l)"
+          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile -delete
+          echo "Cache size after pruning: $(du -sh $HOME/.buildroot-ccache)"

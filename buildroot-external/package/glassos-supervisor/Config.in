@@ -1,0 +1,17 @@
+config BR2_PACKAGE_GLASSOS_SUPERVISOR
+	bool "supervisor"
+	help
+	  GlassOS supervisor. Supervises the glass process and provides
+	  an HTTP API for OTA updates, log access, and
+	  config/asset/module uploads.
+
+if BR2_PACKAGE_GLASSOS_SUPERVISOR
+
+config BR2_PACKAGE_GLASSOS_SUPERVISOR_VERSION
+	string "supervisor version"
+	default "v0.0.0"
+	help
+	  The supervisor release tag to download (e.g. v1.0.0).
+	  Must match SUPERVISOR_VERSION in the top-level Makefile.
+
+endif

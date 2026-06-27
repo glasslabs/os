@@ -1,0 +1,18 @@
+#!/bin/sh
+# glassos-net-config — copy the network configuration from the boot partition.
+#
+set -e
+
+BOOT_MOUNTPOINT="/boot"
+
+if [ ! -d "$BOOT_MOUNTPOINT" ]; then
+	echo "glassos-net-config: $BOOT_MOUNTPOINT doesn't exist."
+	exit 1
+fi
+
+CONFIG_NM="$BOOT_MOUNTPOINT/system-connections"
+if [ -d "$CONFIG_NM" ]; then
+	cp -r "$CONFIG_NM" /etc/NetworkManager/
+	chmod 600 /etc/NetworkManager/system-connections/*
+	sync
+fi

@@ -1,0 +1,15 @@
+[Unit]
+Description=Root Cache Mount
+Documentation=https://github.com/glasslabs/os
+Requires=glassos-system-dirs.service
+After=glassos-system-dirs.service
+Before=glass-agent.service
+
+[Mount]
+What=/data/root/.cache
+Where=/root/.cache
+Type=none
+Options=bind
+
+[Install]
+WantedBy=glassos-bind.target
