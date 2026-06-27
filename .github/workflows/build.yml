@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -67,7 +67,7 @@ jobs:
             make patch perl python3 python3-setuptools rsync texinfo unzip wget xz-utils
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.buildroot-ccache
           key: buildroot-ccache-${{ matrix.board }}-${{ github.run_id }}
