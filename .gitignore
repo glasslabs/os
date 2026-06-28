@@ -1,6 +1,9 @@
 output/
 buildroot/dl/
 
+# Development network configuration files
+buildroot-external/boot-overlay/system-connections/*.nmconnection
+
 # RAUC signing key — never commit the private key
 buildroot-external/ota/dev-ca.key.pem
 buildroot-external/ota/*.key.pem

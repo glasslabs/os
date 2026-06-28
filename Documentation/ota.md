@@ -5,7 +5,7 @@ rootfs scheme.
 
 ## How it works
 
-1. The agent (`glass-agent`) exposes a `/ota` HTTP endpoint that accepts a
+1. The supervisor exposes a `/ota` HTTP endpoint that accepts a
    signed RAUC bundle (`.raucb` file).
 2. RAUC verifies the bundle signature against the keyring at
    `/etc/rauc/keyring.pem`, writes the new rootfs to the inactive slot, and
