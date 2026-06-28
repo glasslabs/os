@@ -62,8 +62,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
-            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
+            output/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
+            output/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           retention-days: 14
@@ -72,6 +72,6 @@ jobs:
         run: |
           echo "Cache size: $(du -sh $HOME/.buildroot-ccache)"
           echo "Files total: $(find $HOME/.buildroot-ccache -mindepth 1 -type f | wc -l)"
-          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile | wc -l)"
-          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile -delete
+          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer output/Makefile | wc -l)"
+          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer output/Makefile -delete
           echo "Cache size after pruning: $(du -sh $HOME/.buildroot-ccache)"

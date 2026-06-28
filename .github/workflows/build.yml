@@ -50,7 +50,7 @@ jobs:
         run: |
           . ${GITHUB_WORKSPACE}/buildroot-external/meta
           echo "version_main=${VERSION_MAJOR}.${VERSION_MINOR}" >> $GITHUB_OUTPUT
-          if [ -z "${GLASSOS_VERSION_PATCH}" ]; then
+          if [ -z "${VERSION_PATCH}" ]; then
             version_full="${VERSION_MAJOR}.${VERSION_MINOR}"
           else
             version_full="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
@@ -101,7 +101,7 @@ jobs:
           archive: false
           name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
           path: |
-            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
+            output/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
           retention-days: 14
 
       - name: Upload RAUC bundle artifact
@@ -110,13 +110,13 @@ jobs:
           archive: false
           name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
           path: |
-            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
+            output/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
           retention-days: 14
 
       - name: Print cache stats
         run: |
           echo "Cache size: $(du -sh $HOME/.buildroot-ccache)"
           echo "Files total: $(find $HOME/.buildroot-ccache -mindepth 1 -type f | wc -l)"
-          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile | wc -l)"
-          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer buildroot/output/${{ matrix.board }}/Makefile -delete
+          echo "Old files to remove: $(find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer output/Makefile | wc -l)"
+          find $HOME/.buildroot-ccache -mindepth 1 -type f -not -anewer output/Makefile -delete
           echo "Cache size after pruning: $(du -sh $HOME/.buildroot-ccache)"
