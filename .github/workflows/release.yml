@@ -62,8 +62,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
-            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
+            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.img.xz
+            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ github.ref_name }}.raucb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           retention-days: 14

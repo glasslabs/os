@@ -101,7 +101,7 @@ jobs:
           archive: false
           name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
           path: |
-            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
+            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.img.xz
           retention-days: 14
 
       - name: Upload RAUC bundle artifact
@@ -110,7 +110,7 @@ jobs:
           archive: false
           name: glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
           path: |
-            buildroot/output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
+            output/${{ matrix.board }}/images/glassos-${{ matrix.board }}-${{ steps.version.outputs.version_full }}.raucb
           retention-days: 14
 
       - name: Print cache stats

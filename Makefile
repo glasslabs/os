@@ -6,6 +6,13 @@ DEFCONFIG_DIR = $(BUILDROOT_EXTERNAL)/configs
 
 TARGETS := $(notdir $(patsubst %_defconfig,%,$(wildcard $(DEFCONFIG_DIR)/*_defconfig)))
 
+# Set O variable if not already done on the command line
+ifneq ("$(origin O)", "command line")
+O := $(BUILDDIR)/output
+else
+override O := $(BUILDDIR)/$(O)
+endif
+
 DOCKER_IMAGE := glassos-builder
 
 # Supervisor version — keep in sync with BR2_PACKAGE_SUPERVISOR_VERSION in the defconfigs.
@@ -31,12 +38,12 @@ GLASSOS_VERSION ?=
 $(addprefix build-,$(TARGETS)):
 $(addprefix build-,$(TARGETS)): build-%:
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O) \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		BR2_DL_DIR=$(BUILDROOT)/dl \
 		$*_defconfig
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O) \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		BR2_DL_DIR=$(BUILDROOT)/dl \
 		$(if $(BR2_CCACHE_DIR),BR2_CCACHE=y BR2_CCACHE_DIR=$(BR2_CCACHE_DIR),) \
@@ -45,19 +52,19 @@ $(addprefix build-,$(TARGETS)): build-%:
 
 $(addprefix menuconfig-,$(TARGETS)): menuconfig-%:
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O) \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		menuconfig
 
 $(addprefix linux-menuconfig-,$(TARGETS)): linux-menuconfig-%:
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O) \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		linux-menuconfig
 
 $(addprefix savedefconfig-,$(TARGETS)): savedefconfig-%:
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O) \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		BR2_DEFCONFIG=$(BUILDROOT_EXTERNAL)/configs/$*_defconfig \
 		savedefconfig
@@ -66,24 +73,26 @@ docker-build:
 	docker build -t $(DOCKER_IMAGE) .
 
 enter:
-	docker run --rm -it \
+	docker run --rm -it --privileged \
+	    -e BUILDER_UID="$(shell id -u)" \
+	    -e BUILDER_GID="$(shell id -g)" \
 	    -v "$(CURDIR)":/build \
-	    -v "glassos-output":/build/buildroot/output \
+	    -v "glassos-output":/build/output \
 	    -v "glassos-ccache":/cache/cc \
 	    -w /build \
 	    $(DOCKER_IMAGE)
 
 $(addprefix uboot-rebuild-,$(BOARDS)): uboot-rebuild-%:
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O)/$* \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		uboot-dirclean
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O)/$* \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		host-uboot-tools-dirclean
 	$(MAKE) -C $(BUILDROOT) \
-		O=$(BUILDROOT)/output/$* \
+		O=$(O)/$* \
 		BR2_EXTERNAL=$(BUILDROOT_EXTERNAL) \
 		BR2_DL_DIR=$(BUILDROOT)/dl \
 		$(if $(BR2_CCACHE_DIR),BR2_CCACHE=y BR2_CCACHE_DIR=$(BR2_CCACHE_DIR),) \
@@ -91,10 +100,10 @@ $(addprefix uboot-rebuild-,$(BOARDS)): uboot-rebuild-%:
 		-j$(shell nproc)
 
 $(addprefix clean-,$(TARGETS)): clean-%:
-	rm -rf $(BUILDROOT)/output/$*
+	rm -rf $(O)/$*
 
 clean-all:
-	rm -rf $(BUILDROOT)/output $(GLASS_DIST)
+	rm -rf $(O) $(GLASS_DIST)
 
 help:
 	@echo ""
