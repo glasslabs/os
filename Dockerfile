@@ -43,6 +43,11 @@ COPY scripts/entry.sh /usr/sbin/entry.sh
 # ccache directory — overrideable, matches the mount point used by enter-* targets.
 ENV BR2_CCACHE_DIR=/cache/cc
 
+# Init entry
+COPY scripts/entry.sh /usr/sbin/
+ENTRYPOINT ["/usr/sbin/entry.sh"]
+
+# Get buildroot
 WORKDIR /build
 
 CMD ["bash"]
